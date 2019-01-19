@@ -96,7 +96,7 @@ struct URLEncoding {
         }
 
         guard let url = urlRequest.url else {
-            throw NSError()
+            throw ApiClientError()
         }
 
         if var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false), !parameters.isEmpty {
