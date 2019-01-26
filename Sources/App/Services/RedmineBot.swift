@@ -9,6 +9,7 @@ final class RedmineBot: ServiceType {
 
     private let usersControllers: UsersController
     private let hoursControllers: HoursController
+    private let userReportControllers: UserReportController
 
     var updater: Updater?
     private var dispatcher: Dispatcher?
@@ -25,6 +26,7 @@ final class RedmineBot: ServiceType {
         
         usersControllers = UsersController(bot: bot, constants: constants, worker: worker)
         hoursControllers = HoursController(bot: bot, constants: constants, worker: worker)
+        userReportControllers = UserReportController(bot: bot, constants: constants, worker: worker)
 
         let dispatcher = try configureDispatcher()
         self.dispatcher = dispatcher
@@ -36,6 +38,7 @@ final class RedmineBot: ServiceType {
 
         dispatcher.add(handler: CommandHandler(commands: ["/refreshUsers"], callback: usersControllers.refreshUsers))
         dispatcher.add(handler: CommandHandler(commands: ["/hours"], callback: hoursControllers.loadHours))
+        dispatcher.add(handler: CommandHandler(commands: ["/dayReport"], callback: userReportControllers.userReport))
 
         let inlineHandler = CallbackQueryHandler(pattern: "\\w+", callback: hoursControllers.inline)
         dispatcher.add(handler: inlineHandler)

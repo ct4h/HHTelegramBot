@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Project: Decodable {
+struct Project: Decodable, Hashable {
     let id: Int
     let name: String
 }
