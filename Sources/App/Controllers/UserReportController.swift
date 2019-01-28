@@ -32,7 +32,7 @@ class UserReportController: ParentController {
             return
         }
 
-        let date = "2019-01-25"
+        let date = "2019-01-28"
 
         paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
             return RedmineRequest.timeEntries(userID: user.id, date: date, offset: offset, limit: limit)
@@ -98,7 +98,7 @@ private extension UserReportController {
 
         var report = "\(user.name): \(totalHours)"
         if !reports.isEmpty {
-            report = report + "\n\n" + separator + "\n" + reports.joined(separator: "\n\(separator)")
+            report = report + "\n\n" + separator + "\n" + reports.joined(separator: "\n\n\(separator)\n")
         }
 
         return report
