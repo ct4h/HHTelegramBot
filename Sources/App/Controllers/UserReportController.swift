@@ -32,7 +32,8 @@ class UserReportController: ParentController {
             return
         }
 
-        let date = "2019-01-28"
+        let date = Date.stringYYYYMMdd
+        print("Make date \(date)")
 
         paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
             return RedmineRequest.timeEntries(userID: user.id, date: date, offset: offset, limit: limit)

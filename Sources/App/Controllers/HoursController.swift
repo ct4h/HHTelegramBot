@@ -40,7 +40,9 @@ class HoursController: ParentController {
         if let userField = inputData.userField {
             // Выполняем запрос
             let users = filterUsers(field: userField)
-            let date = "2018-12-14"
+
+            let date = Date.stringYYYYMMdd
+            print("Make date \(date)")
 
             timeEntries(users: users, date: date).whenSuccess { [weak self] (response) in
                 self?.send(chatID: inputData.chatID, filter: userField, date: date, response: response)
