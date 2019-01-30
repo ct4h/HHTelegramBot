@@ -78,7 +78,7 @@ private extension UserReportController {
             }
 
             totalHours += timeEntry.hours
-            let comment = "[\(timeEntry.activity.name)] \(comments)"
+            let comment = "[\(timeEntry.activity.name)] \(timeEntry.comments)"
             comments.append(comment)
             reportProjects[timeEntry.project] = comments
         }
