@@ -13,4 +13,10 @@ struct TimeEntries: Decodable {
     let comments: String
     let user: ShortUser
     let project: Project
+    let activity: TimeEntries.Activity
+
+    struct Activity: Decodable {
+        let id: Int
+        let name: String
+    }
 }

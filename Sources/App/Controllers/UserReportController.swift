@@ -42,7 +42,7 @@ class UserReportController: ParentController {
                 return
             }
             
-            let report = self.displayData(timeEntries: timeEntries, user: user)
+            let report = self.displayData(timeEntries: timeEntries, user: user, date: date)
             self.send(text: report, updater: update)
         }
     }
@@ -66,7 +66,7 @@ private extension UserReportController {
         return nil
     }
 
-    func displayData(timeEntries: [TimeEntries], user: FullUser) -> String {
+    func displayData(timeEntries: [TimeEntries], user: FullUser, date: String) -> String {
         var totalHours: Double = 0
         var reportProjects: [Project: [String]] = [:]
 
@@ -78,7 +78,8 @@ private extension UserReportController {
             }
 
             totalHours += timeEntry.hours
-            comments.append(timeEntry.comments)
+            let comment = "[\(timeEntry.activity.name)] \(comments)"
+            comments.append(comment)
             reportProjects[timeEntry.project] = comments
         }
 
@@ -97,7 +98,7 @@ private extension UserReportController {
             }
         }
 
-        var report = "\(user.name): \(totalHours)"
+        var report = "[\(date)] \(user.name): \(totalHours)"
         if !reports.isEmpty {
             report = report + "\n\n" + separator + "\n" + reports.joined(separator: "\n\n\(separator)\n")
         }
