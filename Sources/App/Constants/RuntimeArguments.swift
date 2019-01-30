@@ -50,6 +50,10 @@ struct RuntimeArguments {
     let telegram: Telegramm
 
     init(env: Environment) {
+        for (key, value) in ProcessInfo.processInfo.environment {
+            print("[RuntimeArguments] \(key) - \(value)")
+        }
+
         redmine = Redmine()
         telegram = Telegramm()
     }
