@@ -8,6 +8,7 @@
 import Foundation
 import Telegrammer
 import Async
+import LoggerAPI
 
 /**
  Контроллер формирует отчет по конкретному человеку
@@ -33,11 +34,13 @@ class UserReportController: ParentController {
         }
 
         let date = Date.stringYYYYMMdd
-        print("Make date \(date)")
 
         paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
             return RedmineRequest.timeEntries(userID: user.id, date: date, offset: offset, limit: limit)
-        }).whenSuccess { [weak self] timeEntries in
+        }).catch { [weak self] error in
+            Log.error(error.localizedDescription)
+            self?.send(text: "Не удалось выполнить запрос к редмайну", updater: update)
+        }.whenSuccess { [weak self] timeEntries in
             guard let self = self else {
                 return
             }
