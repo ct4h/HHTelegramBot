@@ -16,10 +16,10 @@ import LoggerAPI
 class UserReportController: ParentController {
 
     private lazy var paginationManager = {
-        return PaginationManager<TimeEntriesResponse>(host: constants.redmine.domain,
-                                                      port: constants.redmine.port,
-                                                      access: constants.redmine.access,
-                                                      worker: worker)
+        return PaginationManager<TimeEntriesResponse>(host: env.constants.redmine.domain,
+                                                      port: env.constants.redmine.port,
+                                                      access: env.constants.redmine.access,
+                                                      worker: env.worker)
     }()
 
     func userReport(_ update: Update, _ context: BotContext?) throws {

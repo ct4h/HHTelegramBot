@@ -10,15 +10,19 @@ import Foundation
 extension Date {
 
     static var stringYYYYMMdd: String {
-        return DateFormatter.YYYYMMdd.string(from: Date())
+        return Date().stringYYYYMMdd
+    }
+
+    var stringYYYYMMdd: String {
+        return DateFormatter.yyyyMMdd.string(from: self)
     }
 }
 
 private extension DateFormatter {
 
-    static var YYYYMMdd: DateFormatter {
+    static var yyyyMMdd: DateFormatter {
         let formatter = DateFormatter()
-        formatter.dateFormat = "YYYY-MM-dd"
+        formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }
 }

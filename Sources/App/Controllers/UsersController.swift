@@ -14,10 +14,10 @@ import Vapor
 class UsersController: ParentController {
 
     private lazy var paginationManager = {
-        return PaginationManager<UsersResponse>(host: constants.redmine.domain,
-                                                port: constants.redmine.port,
-                                                access: constants.redmine.access,
-                                                worker: worker)
+        return PaginationManager<UsersResponse>(host: env.constants.redmine.domain,
+                                                port: env.constants.redmine.port,
+                                                access: env.constants.redmine.access,
+                                                worker: env.worker)
     }()
 
     func refreshUsers(_ update: Update, _ context: BotContext?) throws {

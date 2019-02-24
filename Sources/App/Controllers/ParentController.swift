@@ -8,17 +8,29 @@
 import Foundation
 import Telegrammer
 import Vapor
+import LoggerAPI
 
-class ParentController {
+class BotControllerEnv {
 
     let bot: Bot
     let constants: RuntimeArguments
     let worker: Worker
+    let container: Container
 
-    init(bot: Bot, constants: RuntimeArguments, worker: Worker) {
+    init(bot: Bot, constants: RuntimeArguments, worker: Worker, container: Container) {
         self.bot = bot
         self.constants = constants
         self.worker = worker
+        self.container = container
+    }
+}
+
+class ParentController {
+
+    let env: BotControllerEnv
+
+    init(env: BotControllerEnv) {
+        self.env = env
     }
 
     func send(text: String, updater: Update) {
@@ -27,10 +39,49 @@ class ParentController {
         }
 
         do {
-            try self.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(message.chat.id),
-                                                                   text: text))
+            try self.env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(message.chat.id),
+                                                                       text: text))
         } catch {
-            print(error.localizedDescription)
+            Log.error("Error send message \(error.localizedDescription)")
         }
+    }
+
+    func send(chatID: Int64, messageID: Int?, text: String, keyboardMarkup: InlineKeyboardMarkup) throws {
+        Log.info("Send buttons chatID \(chatID) messageID \(String(describing: messageID))")
+
+        if let messageID = messageID {
+            let params = Bot.EditMessageReplyMarkupParams(chatId: .chat(chatID),
+                                                          messageId: messageID,
+                                                          inlineMessageId: nil,
+                                                          replyMarkup: keyboardMarkup)
+
+            try env.bot.editMessageReplyMarkup(params: params).whenSuccess({ [weak self] result in
+                switch result {
+                case .bool(let value):
+                    if !value, let self = self {
+                        do {
+                            try self.send(chatID: chatID,
+                                          text: text,
+                                          markup: .inlineKeyboardMarkup(keyboardMarkup))
+                        } catch {
+                            Log.error("Error send inline message \(error.localizedDescription)")
+                        }
+                    }
+                case .message(_):
+                    Log.info("Complete replace message")
+                }
+            })
+        } else {
+            try self.send(chatID: chatID,
+                          text: text,
+                          markup: .inlineKeyboardMarkup(keyboardMarkup))
+        }
+    }
+
+    private func send(chatID: Int64, text: String, markup: ReplyMarkup) throws {
+        try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID),
+                                                              text: text,
+                                                              parseMode: .markdown,
+                                                              replyMarkup: markup))
     }
 }

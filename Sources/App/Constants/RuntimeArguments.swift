@@ -46,14 +46,50 @@ struct RuntimeArguments {
         }
     }
 
+    struct DataBase {
+        let hostname: String
+        let port: Int
+        let username: String
+        let database: String
+
+        private enum Keys: String {
+            case hostname = "DB_HOST"
+            case port = "DB_PORT"
+            case username = "DB_USER"
+            case database = "DB_DATABASE"
+        }
+
+        init() {
+            if let value = Environment.get(Keys.hostname.rawValue) {
+                hostname = value
+            } else {
+                hostname = "localhost"
+            }
+
+            if let value = Environment.get(Keys.port.rawValue) {
+                port = Int(value) ?? 0
+            } else {
+                port = 5432
+            }
+
+            if let value = Environment.get(Keys.username.rawValue) {
+                username = value
+            } else {
+                fatalError("Cannot find db username")
+            }
+
+            if let value = Environment.get(Keys.database.rawValue) {
+                database = value
+            } else {
+                fatalError("Cannot find db database")
+            }
+        }
+    }
+
     let redmine: Redmine
     let telegram: Telegramm
 
     init(env: Environment) {
-        for (key, value) in ProcessInfo.processInfo.environment {
-            print("[RuntimeArguments] \(key) - \(value)")
-        }
-
         redmine = Redmine()
         telegram = Telegramm()
     }
