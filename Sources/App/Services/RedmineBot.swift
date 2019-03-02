@@ -28,10 +28,15 @@ final class RedmineBot: ServiceType {
         let controllerEnv = BotControllerEnv(bot: bot, constants: constants, worker: worker, container: container)
 
         usersControllers = UsersController(env: controllerEnv)
+
         hoursControllers = HoursController(env: controllerEnv)
+
         userReportControllers = UserReportController(env: controllerEnv)
+        userReportControllers.delegate = hoursControllers
+
         subscriptionController = SubscriptionController(env: controllerEnv)
-        subscriptionController.delegate = hoursControllers
+        subscriptionController.add(child: hoursControllers)
+        subscriptionController.add(child: userReportControllers)
 
         let dispatcher = try configureDispatcher()
         self.dispatcher = dispatcher

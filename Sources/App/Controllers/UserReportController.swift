@@ -13,7 +13,7 @@ import LoggerAPI
 /**
  Контроллер формирует отчет по конкретному человеку
  */
-class UserReportController: ParentController, CommandsHandler {
+class UserReportController: ParentController, CommandsHandler, InlineCommandsHandler {
 
     private lazy var paginationManager = {
         return PaginationManager<TimeEntriesResponse>(host: env.constants.redmine.domain,
@@ -21,6 +21,8 @@ class UserReportController: ParentController, CommandsHandler {
                                                       access: env.constants.redmine.access,
                                                       worker: env.worker)
     }()
+
+    weak var delegate: HoursControllerProvider?
 
     // MARK: - CommandsHandler
 
@@ -58,6 +60,48 @@ class UserReportController: ParentController, CommandsHandler {
             let text = "Не удалось выполнить команду /dayReport"
             self?.sendIn(chatID: message.chat.id, text: text, error: error)
         }
+    }
+
+    // MARK: - InlineCommandsHandler
+
+    var inlineContext: String {
+        return "reports"
+    }
+
+    func inline(query: String, chatID: Int64, messageID: Int?, provider: InlineCommandsProvider?) throws {
+        Log.info("reports inline query \(query)")
+
+        try delegate?.inline(query: query, chatID: chatID, messageID: messageID, provider: { (chatID, query) in
+            if let provider = provider {
+                provider(chatID, query)
+            } else {
+                self.delegate?.handle(chatID: chatID, query: query, view: self)
+            }
+        })
+    }
+}
+
+// MARK: - Handle subscription
+
+private extension UserReportController {
+
+    func handle(chatID: Int64, query: String) {
+        delegate?.handle(chatID: chatID, query: query, view: self)
+    }
+}
+
+extension UserReportController: HoursControllerView {
+
+    func sendHours(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])]) {
+        response.forEach { (info) in
+            let report = displayData(timeEntries: info.1, user: info.0, date: date)
+            send(chatID: chatID, text: report)
+        }
+    }
+
+    func sendHours(chatID: Int64, error: Error) {
+        let errorText = "Не удалось выполнить команду /reports"
+        sendIn(chatID: chatID, text: errorText, error: error)
     }
 }
 

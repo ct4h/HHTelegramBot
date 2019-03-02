@@ -10,6 +10,15 @@ import Telegrammer
 import Async
 import LoggerAPI
 
+protocol HoursControllerView {
+    func sendHours(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])])
+    func sendHours(chatID: Int64, error: Error)
+}
+
+protocol HoursControllerProvider: InlineCommandsHandler {
+    func handle(chatID: Int64, query: String, view: HoursControllerView)
+}
+
 class HoursController: ParentController, CommandsHandler, InlineCommandsHandler {
 
     private lazy var paginationManager = {
@@ -50,7 +59,7 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
             if let provider = provider {
                 provider(chatID, query)
             } else {
-                handle(chatID: chatID, request: request)
+                handle(chatID: chatID, request: request, view: self)
             }
         } else if let request = HoursGroupRequest(query: query) {
             let controller = HoursPeriodsController(env: env)
@@ -63,10 +72,19 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
             try controller.handle(chatID: chatID, messageID: messageID, request: request)
         }
     }
+}
 
-    // MARK: -
+extension HoursController: HoursControllerProvider {
 
-    private func handle(chatID: Int64, request: HoursPeriodRequest) {
+    func handle(chatID: Int64, query: String, view: HoursControllerView) {
+        guard let request = HoursPeriodRequest(query: query) else {
+            return
+        }
+
+        handle(chatID: chatID, request: request, view: view)
+    }
+
+    private func handle(chatID: Int64, request: HoursPeriodRequest, view: HoursControllerView) {
         let userField = FullUserField(name: request.groupRequest.departmentRequest.department,
                                       value: request.groupRequest.group)
         let users = self.users(userField: userField)
@@ -74,22 +92,21 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
 
         let promise = timeEntries(users: users, date: date)
 
-        promise.whenSuccess { [weak self] (response) in
-            self?.send(chatID: chatID, filter: userField, date: date, response: response)
+        promise.whenSuccess { (response) in
+            view.sendHours(chatID: chatID, filter: userField, date: date, response: response)
         }
 
-        promise.whenFailure { [weak self] (error) in
-            let errorText = "Не удалось выполнить команду /hours"
-            self?.sendIn(chatID: chatID, text: errorText, error: error)
+        promise.whenFailure { (error) in
+            view.sendHours(chatID: chatID, error: error)
         }
     }
 }
 
-// MARK: - Bot callbacks
+// MARK: - View
 
-private extension HoursController {
+extension HoursController: HoursControllerView {
 
-    func send(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])]) {
+    func sendHours(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])]) {
         guard chatID != 0 else {
             return
         }
@@ -107,8 +124,12 @@ private extension HoursController {
             print(error.localizedDescription)
         }
     }
-}
 
+    func sendHours(chatID: Int64, error: Error) {
+        let errorText = "Не удалось выполнить команду /hours"
+        sendIn(chatID: chatID, text: errorText, error: error)
+    }
+}
 
 // MARK: - API
 

@@ -68,29 +68,33 @@ class ParentController {
                 switch result {
                 case .bool(let value):
                     if !value, let self = self {
-                        do {
-                            try self.send(chatID: chatID,
-                                          text: text,
-                                          markup: .inlineKeyboardMarkup(keyboardMarkup))
-                        } catch {
-                            Log.error("Error send inline message \(error.localizedDescription)")
-                        }
+                        self.send(chatID: chatID,
+                                  text: text,
+                                  markup: .inlineKeyboardMarkup(keyboardMarkup))
                     }
                 case .message(_):
                     Log.info("Complete replace message")
                 }
             })
         } else {
-            try self.send(chatID: chatID,
-                          text: text,
-                          markup: .inlineKeyboardMarkup(keyboardMarkup))
+            self.send(chatID: chatID,
+                      text: text,
+                      markup: .inlineKeyboardMarkup(keyboardMarkup))
         }
     }
 
-    private func send(chatID: Int64, text: String, markup: ReplyMarkup) throws {
-        try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID),
-                                                              text: text,
-                                                              parseMode: .markdown,
-                                                              replyMarkup: markup))
+    func send(chatID: Int64, text: String, markup: ReplyMarkup? = nil) {
+        do {
+            if let markup = markup {
+                try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID),
+                                                                      text: text,
+                                                                      parseMode: .markdown,
+                                                                      replyMarkup: markup))
+            } else {
+                try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: text))
+            }
+        } catch {
+            Log.error("Error send message \(error.localizedDescription)")
+        }
     }
 }

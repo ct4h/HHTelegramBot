@@ -13,8 +13,7 @@ import FluentPostgreSQL
 
 class SubscriptionController: ParentController, CommandsHandler, InlineCommandsHandler {
 
-    // TODO: Переделать на массив
-    weak var delegate: InlineCommandsHandler?
+    private var childHandlers: [InlineCommandsHandler] = []
 
     override init(env: BotControllerEnv) {
         super.init(env: env)
@@ -26,6 +25,10 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
         }
     }
 
+    func add(child: InlineCommandsHandler) {
+        childHandlers.append(child)
+    }
+
     // MARK: - CommandsHandler
 
     var handlers: [CommandHandler] {
@@ -35,15 +38,6 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
         ]
     }
 
-    private func subscription(_ update: Update, _ context: BotContext?) throws {
-        guard let chatID = update.message?.chat.id, let delegate = delegate else {
-            return
-        }
-
-        let query = "\(inlineContext)/\(delegate.inlineContext)"
-        try inline(query: query, chatID: chatID, messageID: nil, provider: nil)
-    }
-
     // MARK: - InlineCommandsHandler
 
     var inlineContext: String {
@@ -51,22 +45,24 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
     }
 
     func inline(query: String, chatID: Int64, messageID: Int?, provider: InlineCommandsProvider?) throws {
-        guard let delegate = delegate else {
-            return
-        }
-
-        // TODO: В будущем сделать проверку регуляркой
-
         Log.info("Subscription handle query \(query) chatID \(chatID) messageID \(String(describing: messageID))")
 
-        try delegate.inline(query: query, chatID: chatID, messageID: messageID, provider: { [weak self] chatID, query in
-            guard let self = self else {
-                return
-            }
+        func check(_ child: InlineCommandsHandler) -> Bool {
+            let pattern = "^\(inlineContext)/\(child.inlineContext)(.+)?$"
+            Log.info("pattern \(pattern)")
+            return query.matchRegexp(pattern: pattern)
+        }
 
-            self.saveQuery(chatID: chatID, query: query)
-            provider?(chatID, query)
-        })
+        for child in childHandlers where check(child) {
+            try child.inline(query: query, chatID: chatID, messageID: messageID, provider: { [weak self] chatID, query in
+                guard let self = self else {
+                    return
+                }
+
+                self.saveQuery(chatID: chatID, query: query)
+                provider?(chatID, query)
+            })
+        }
     }
 
     // MARK: -
@@ -94,6 +90,29 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
     }
 }
 
+// MARK: - Subscription
+
+private extension SubscriptionController {
+
+    private func subscription(_ update: Update, _ context: BotContext?) throws {
+        guard let chatID = update.message?.chat.id else {
+            return
+        }
+
+        var buttons: [[InlineKeyboardButton]] = []
+        for child in childHandlers {
+            let callbackData = "\(inlineContext)/\(child.inlineContext)"
+            buttons.append([InlineKeyboardButton(text: child.inlineContext, callbackData: callbackData)])
+        }
+
+        let title = "Выберите команду на которую хотите подписаться"
+        try send(chatID: chatID,
+                 messageID: nil,
+                 text: title,
+                 keyboardMarkup: InlineKeyboardMarkup(inlineKeyboard: buttons))
+    }
+}
+
 // MARK: - Force execute subscriptions
 
 private extension SubscriptionController {
@@ -110,6 +129,8 @@ private extension SubscriptionController {
     func executeSubscriptions(chatID: Int64?) {
         let connection = DataBaseConnection(container: env.container)
         let requestPromise: Future<[Subscription]>
+
+        // TODO: Добавить фильтрацию по времени
 
         if let chatID = chatID {
             requestPromise = Subscription
@@ -137,16 +158,12 @@ private extension SubscriptionController {
     }
 
     func execute(subscriptions: [Subscription]) throws {
-        guard let delegate = delegate else {
-            return
-        }
-
         for subscription in subscriptions {
-            for inlineHandler in [delegate] where inlineHandler.check(query: subscription.query) {
-                try inlineHandler.inline(query: subscription.query,
-                                         chatID: subscription.chatID,
-                                         messageID: nil,
-                                         provider: nil)
+            for child in childHandlers where child.check(query: subscription.query) {
+                try child.inline(query: subscription.query,
+                                 chatID: subscription.chatID,
+                                 messageID: nil,
+                                 provider: nil)
             }
         }
     }
