@@ -41,54 +41,17 @@ final class RedmineBot: ServiceType {
     private func configureDispatcher() throws -> Dispatcher {
         let dispatcher = Dispatcher(bot: bot)
 
-        let commandHandlers = self.commandHandlers.reduce([]) { (result, handler) -> [CommandHandler] in
-            var result = result
-            result.append(contentsOf: handler.handlers)
-            return result
-        }
-
-        commandHandlers.forEach({ dispatcher.add(handler: $0) })
-
-        // TODO: Перенести внутрь subscriptionController
-        dispatcher.add(handler: CommandHandler(commands: ["/force"], callback: force))
+        commandHandlers
+            .reduce([]) { (result, handler) -> [CommandHandler] in
+                var result = result
+                result.append(contentsOf: handler.handlers)
+                return result
+            }
+            .forEach({ dispatcher.add(handler: $0) })
 
         inlineCommmandHandlers.forEach({ dispatcher.add(handler: $0.callbackHanler) })
 
         return dispatcher
-    }
-
-    // TODO: Перенести обработку таймера внутрь subscriptionController
-
-    func executeTimer() {
-        Subscription
-            .query(on: DataBaseConnection(container: subscriptionController.env.container))
-            .all()
-            .whenSuccess { [weak self] subscriptions in
-                guard let self = self else {
-                    return
-                }
-
-                do {
-                    try self.execute(subscriptions: subscriptions)
-                } catch {
-                    print(error.localizedDescription)
-                }
-        }
-    }
-
-    func force(_ update: Update, _ context: BotContext?) throws {
-        executeTimer()
-    }
-
-    private func execute(subscriptions: [Subscription]) throws {
-        for subscription in subscriptions {
-            for inlineHandler in inlineCommmandHandlers where inlineHandler.check(query: subscription.query) {
-                try inlineHandler.inline(query: subscription.query,
-                                         chatID: subscription.chatID,
-                                         messageID: nil,
-                                         provider: nil)
-            }
-        }
     }
 
     // MARK: - Helpers

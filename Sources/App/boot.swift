@@ -1,6 +1,5 @@
 import Vapor
 import Telegrammer
-import Jobs
 
 private var botService: RedmineBot?
 
@@ -25,10 +24,4 @@ private func start(bot: RedmineBot?) throws {
             print("Fail restart bot")
         }
     })
-
-    // Запускаем выполнение в 11:00
-    let startTime = SchedulerTime(hours: 11, minute: 0, dayOffset: nil)
-    schedulerDay(start: startTime) {
-        bot.executeTimer()
-    }
 }
