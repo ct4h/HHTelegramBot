@@ -34,7 +34,10 @@ class PaginationManager<T: Decodable & PagintaionResponse> {
     }
 
     private func _all(requestFactory: @escaping RequestFactory, offset: Int, buffer: [T.ItemsType], promise: Promise<[T.ItemsType]>) {
-        apiClient.respond(target: requestFactory(offset, limit)).whenSuccess { [weak self] (response: T) in
+
+        let requestPromise: Future<T> = apiClient.respond(target: requestFactory(offset, limit))
+
+        requestPromise.whenSuccess { [weak self] (response: T) in
             let result = buffer + response.items
 
             if response.isFinished {
@@ -42,6 +45,10 @@ class PaginationManager<T: Decodable & PagintaionResponse> {
             } else {
                 self?._all(requestFactory: requestFactory, offset: response.nextOffset, buffer: result, promise: promise)
             }
+        }
+
+        requestPromise.whenFailure { (error) in
+            promise.fail(error: error)
         }
     }
 }

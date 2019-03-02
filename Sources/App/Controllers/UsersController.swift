@@ -10,6 +10,7 @@ import Telegrammer
 import Async
 import NIO
 import Vapor
+import LoggerAPI
 
 class UsersController: ParentController {
 
@@ -21,9 +22,22 @@ class UsersController: ParentController {
     }()
 
     func refreshUsers(_ update: Update, _ context: BotContext?) throws {
-        paginationManager.all(requestFactory: { RedmineRequest.users(offset: $0, limit: $1) }).whenSuccess { [weak self] (users) in
+        guard let message = update.message else {
+            send(text: "Не удалось определить пользователя", updater: update)
+            return
+        }
+
+        let promise = paginationManager.all(requestFactory: { RedmineRequest.users(offset: $0, limit: $1) })
+
+        promise.whenSuccess { [weak self] (users) in
             Storage.shared.users = users
             self?.send(text: "Информация пользователей обновлена", updater: update)
+        }
+
+        promise.whenFailure { [weak self] error in
+            Log.info("Error send request users \(error)")
+            let text = "Не удалось выполнить команду /refreshUsers"
+            self?.sendIn(chatID: message.chat.id, text: text, error: error)
         }
     }
 }

@@ -23,7 +23,7 @@ class UserReportController: ParentController {
     }()
 
     func userReport(_ update: Update, _ context: BotContext?) throws {
-        guard let from = update.message?.from else {
+        guard let message = update.message, let from = message.from else {
             send(text: "Не удалось определить пользователя", updater: update)
             return
         }
@@ -35,18 +35,22 @@ class UserReportController: ParentController {
 
         let date = Date.stringYYYYMMdd
 
-        paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
+        let promise = paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
             return RedmineRequest.timeEntries(userID: user.id, date: date, offset: offset, limit: limit)
-        }).catch { [weak self] error in
-            Log.error(error.localizedDescription)
-            self?.send(text: "Не удалось выполнить запрос к редмайну", updater: update)
-        }.whenSuccess { [weak self] timeEntries in
+        })
+
+        promise.whenSuccess { [weak self] timeEntries in
             guard let self = self else {
                 return
             }
-            
+
             let report = self.displayData(timeEntries: timeEntries, user: user, date: date)
             self.send(text: report, updater: update)
+        }
+
+        promise.whenFailure { [weak self] error in
+            let text = "Не удалось выполнить команду /dayReport"
+            self?.sendIn(chatID: message.chat.id, text: text, error: error)
         }
     }
 }

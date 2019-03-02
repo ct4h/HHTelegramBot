@@ -66,8 +66,15 @@ class HoursController: ParentController, InlineCommandsHandler {
         let users = self.users(userField: userField)
         let date = self.date(request: request)
 
-        timeEntries(users: users, date: date).whenSuccess { [weak self] (response) in
+        let promise = timeEntries(users: users, date: date)
+
+        promise.whenSuccess { [weak self] (response) in
             self?.send(chatID: chatID, filter: userField, date: date, response: response)
+        }
+
+        promise.whenFailure { [weak self] (error) in
+            let errorText = "Не удалось выполнить команду /hours"
+            self?.sendIn(chatID: chatID, text: errorText, error: error)
         }
     }
 }
@@ -119,11 +126,17 @@ private extension HoursController {
 
         let user = users[buffer.count]
 
-        paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
+        let requestPromise = paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
             return RedmineRequest.timeEntries(userID: user.id, date: date, offset: offset, limit: limit)
-        }).whenSuccess { [weak self] (timeEntries) in
+        })
+
+        requestPromise.whenSuccess { [weak self] (timeEntries) in
             let result = buffer + [(user, timeEntries)]
             self?._timeEntries(users: users, date: date, buffer: result, promise: promise)
+        }
+
+        requestPromise.whenFailure { (error) in
+            promise.fail(error: error)
         }
     }
 }

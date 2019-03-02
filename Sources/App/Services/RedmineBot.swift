@@ -52,6 +52,8 @@ final class RedmineBot: ServiceType {
         return dispatcher
     }
 
+    // TODO: Перенести обработку таймера внутрь subscriptionController
+
     func executeTimer() {
         Subscription
             .query(on: DataBaseConnection(container: subscriptionController.env.container))

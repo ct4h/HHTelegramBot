@@ -14,14 +14,17 @@ class ApiClient {
     private let host: String
     private let port: Int
     private let access: String
-    private let worker: Worker
+    private let backgroundWorker: Worker = ApiClient.backgroundWorker
+    private let callBackWorker: Worker
     private var client: HTTPClient?
+
+    private static let backgroundWorker = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
     init(host: String, port: Int, access: String, worker: Worker) {
         self.host = host
         self.port = port
         self.access = access
-        self.worker = worker
+        self.callBackWorker = worker
     }
 
     func respond<T: Decodable>(target: ApiTarget) -> Future<T> {
@@ -31,15 +34,27 @@ class ApiClient {
                                       url: url(target: target)!,
                                       headers: target.httpHeaders(access: access))
 
-        let promise = worker.eventLoop.newPromise(T.self)
+        let promise = callBackWorker.eventLoop.newPromise(T.self)
 
         Log.info("Sending request:\n\(httpRequest.description)")
 
-        worker.eventLoop.execute { [weak self] in
-            self?.send(request: httpRequest).whenSuccess({ (result) in
+        backgroundWorker.eventLoop.execute { [weak self] in
+            guard let self = self else {
+                return
+            }
+
+            let requestPromise: Future<T> = self.send(request: httpRequest)
+
+            requestPromise.whenSuccess({ (result) in
                 promise.succeed(result: result)
             })
+
+            requestPromise.whenFailure({ (error) in
+                Log.info("Error send request \(error)")
+                promise.fail(error: error)
+            })
         }
+
         return promise.futureResult
     }
 
@@ -47,10 +62,10 @@ class ApiClient {
         var futureClient: Future<HTTPClient>
         if let existingClient = client {
             Log.info("Using existing HTTP client")
-            futureClient = Future<HTTPClient>.map(on: worker, { existingClient })
+            futureClient = Future<HTTPClient>.map(on: backgroundWorker, { existingClient })
         } else {
             futureClient = HTTPClient
-                .connect(scheme: .https, hostname: host, port: port, on: worker, onError: { [weak self] (error) in
+                .connect(scheme: .https, hostname: host, port: port, connectTimeout: .seconds(120), on: backgroundWorker, onError: { [weak self] (error) in
                     Log.info("HTTP Client was down with error: \n\(error.localizedDescription)")
                     Log.error(error.localizedDescription)
                     self?.client = nil
@@ -60,6 +75,7 @@ class ApiClient {
                     self.client = freshClient
                 })
         }
+
         return futureClient
             .catch { (error) in
                 Log.info("HTTP Client was down with error: \n\(error.localizedDescription)")

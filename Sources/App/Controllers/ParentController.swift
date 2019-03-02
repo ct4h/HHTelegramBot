@@ -46,6 +46,15 @@ class ParentController {
         }
     }
 
+    func sendIn(chatID: Int64, text: String, error: Error) {
+        let errorMessage = text + "\n" + error.localizedDescription
+        do {
+            try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: errorMessage))
+        } catch {
+            Log.error(errorMessage)
+        }
+    }
+
     func send(chatID: Int64, messageID: Int?, text: String, keyboardMarkup: InlineKeyboardMarkup) throws {
         Log.info("Send buttons chatID \(chatID) messageID \(String(describing: messageID))")
 
