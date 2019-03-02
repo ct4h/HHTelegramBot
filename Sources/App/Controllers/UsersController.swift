@@ -12,7 +12,7 @@ import NIO
 import Vapor
 import LoggerAPI
 
-class UsersController: ParentController {
+class UsersController: ParentController, CommandsHandler {
 
     private lazy var paginationManager = {
         return PaginationManager<UsersResponse>(host: env.constants.redmine.domain,
@@ -21,7 +21,13 @@ class UsersController: ParentController {
                                                 worker: env.worker)
     }()
 
-    func refreshUsers(_ update: Update, _ context: BotContext?) throws {
+    // MARK: - CommandsHandler
+
+    var handlers: [CommandHandler] {
+        return [CommandHandler(commands: ["/refreshUsers"], callback: refreshUsers)]
+    }
+
+    private func refreshUsers(_ update: Update, _ context: BotContext?) throws {
         guard let message = update.message else {
             send(text: "Не удалось определить пользователя", updater: update)
             return

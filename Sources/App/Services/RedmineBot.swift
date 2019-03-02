@@ -41,13 +41,18 @@ final class RedmineBot: ServiceType {
     private func configureDispatcher() throws -> Dispatcher {
         let dispatcher = Dispatcher(bot: bot)
 
-        dispatcher.add(handler: CommandHandler(commands: ["/refreshUsers"], callback: usersControllers.refreshUsers))
-        dispatcher.add(handler: CommandHandler(commands: ["/hours"], callback: hoursControllers.loadHours))
-        dispatcher.add(handler: CommandHandler(commands: ["/dayReport"], callback: userReportControllers.userReport))
-        dispatcher.add(handler: CommandHandler(commands: ["/subscription"], callback: subscriptionController.subscription))
+        let commandHandlers = self.commandHandlers.reduce([]) { (result, handler) -> [CommandHandler] in
+            var result = result
+            result.append(contentsOf: handler.handlers)
+            return result
+        }
+
+        commandHandlers.forEach({ dispatcher.add(handler: $0) })
+
+        // TODO: Перенести внутрь subscriptionController
         dispatcher.add(handler: CommandHandler(commands: ["/force"], callback: force))
 
-        inlineHandlers.forEach({ dispatcher.add(handler: $0.callbackHanler) })
+        inlineCommmandHandlers.forEach({ dispatcher.add(handler: $0.callbackHanler) })
 
         return dispatcher
     }
@@ -77,7 +82,7 @@ final class RedmineBot: ServiceType {
 
     private func execute(subscriptions: [Subscription]) throws {
         for subscription in subscriptions {
-            for inlineHandler in inlineHandlers where inlineHandler.check(query: subscription.query) {
+            for inlineHandler in inlineCommmandHandlers where inlineHandler.check(query: subscription.query) {
                 try inlineHandler.inline(query: subscription.query,
                                          chatID: subscription.chatID,
                                          messageID: nil,
@@ -88,7 +93,11 @@ final class RedmineBot: ServiceType {
 
     // MARK: - Helpers
 
-    private var inlineHandlers: [InlineCommandsHandler] {
+    private var commandHandlers: [CommandsHandler] {
+        return [usersControllers, hoursControllers, userReportControllers, subscriptionController]
+    }
+
+    private var inlineCommmandHandlers: [InlineCommandsHandler] {
         return [hoursControllers, subscriptionController]
     }
 }

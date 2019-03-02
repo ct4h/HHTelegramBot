@@ -10,7 +10,7 @@ import Telegrammer
 import Async
 import LoggerAPI
 
-class HoursController: ParentController, InlineCommandsHandler {
+class HoursController: ParentController, CommandsHandler, InlineCommandsHandler {
 
     private lazy var paginationManager = {
         return PaginationManager<TimeEntriesResponse>(host: env.constants.redmine.domain,
@@ -19,7 +19,13 @@ class HoursController: ParentController, InlineCommandsHandler {
                                                       worker: env.worker)
     }()
 
-    func loadHours(_ update: Update, _ context: BotContext?) throws {
+    // MARK: - CommandsHandler
+
+    var handlers: [CommandHandler] {
+        return [CommandHandler(commands: ["/hours"], callback: loadHours)]
+    }
+    
+    private func loadHours(_ update: Update, _ context: BotContext?) throws {
         guard let chatID = update.message?.chat.id else {
             return
         }

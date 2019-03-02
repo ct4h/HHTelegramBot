@@ -10,14 +10,18 @@ import Telegrammer
 import Async
 import LoggerAPI
 
-class SubscriptionController: ParentController, InlineCommandsHandler {
+class SubscriptionController: ParentController, CommandsHandler, InlineCommandsHandler {
 
     // TODO: Переделать на массив
     weak var delegate: InlineCommandsHandler?
 
-    // MARK: -
+    // MARK: - CommandsHandler
 
-    func subscription(_ update: Update, _ context: BotContext?) throws {
+    var handlers: [CommandHandler] {
+        return [CommandHandler(commands: ["/subscription"], callback: subscription)]
+    }
+
+    private func subscription(_ update: Update, _ context: BotContext?) throws {
         guard let chatID = update.message?.chat.id, let delegate = delegate else {
             return
         }

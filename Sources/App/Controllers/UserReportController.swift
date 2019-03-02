@@ -13,7 +13,7 @@ import LoggerAPI
 /**
  Контроллер формирует отчет по конкретному человеку
  */
-class UserReportController: ParentController {
+class UserReportController: ParentController, CommandsHandler {
 
     private lazy var paginationManager = {
         return PaginationManager<TimeEntriesResponse>(host: env.constants.redmine.domain,
@@ -22,7 +22,13 @@ class UserReportController: ParentController {
                                                       worker: env.worker)
     }()
 
-    func userReport(_ update: Update, _ context: BotContext?) throws {
+    // MARK: - CommandsHandler
+
+    var handlers: [CommandHandler] {
+        return [CommandHandler(commands: ["/dayReport"], callback: userReport)]
+    }
+
+    private func userReport(_ update: Update, _ context: BotContext?) throws {
         guard let message = update.message, let from = message.from else {
             send(text: "Не удалось определить пользователя", updater: update)
             return
