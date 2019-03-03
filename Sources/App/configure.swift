@@ -23,6 +23,7 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     // Configure migrations
     var migrations = MigrationConfig()
     migrations.add(model: Subscription.self, database: .psql)
+    migrations.add(migration: AddSubscriptionTime.self, database: .psql)
     services.register(migrations)
 
     ///Registering bot as a vapor service

@@ -70,7 +70,7 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
 
         print("save query in db \(query)")
 
-        Subscription(chatID: chatID, query: query, period: SubscriptionPeriod.daily.rawValue)
+        Subscription(chatID: chatID, query: query, period: SubscriptionPeriod.daily.rawValue, time: 11)
             .save(on: DataBaseConnection(container: env.container))
             .whenSuccess { [weak self] subscription in
                 guard let self = self else {
