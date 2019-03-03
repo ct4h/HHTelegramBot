@@ -39,7 +39,9 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
             return
         }
 
-        try inline(query: inlineContext, chatID: chatID, messageID: nil, provider: nil)
+        try inline(query: inlineContext, chatID: chatID, provider: nil)?.throwingSuccess({ (request) in
+            try self.sendInlineCommands(chatID: chatID, request: request)
+        })
     }
 
     // MARK: - InlineCommandsHandler
@@ -48,29 +50,31 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
         return "hours"
     }
 
-    func inline(query: String, chatID: Int64, messageID: Int?, provider: InlineCommandsProvider?) throws {
+    func inline(query: String, chatID: Int64, provider: InlineCommandsProvider?) throws -> Future<InlineCommandsRequest>? {
         Log.info("hours inline query \(query)")
 
-        if let request = HoursPeriodRequest(query: query) {
-            if let messageID = messageID {
-                try env.bot.deleteMessage(params: .init(chatId: .chat(chatID), messageId: messageID))
-            }
+        let factory: InlineCommandsRequestFactory
 
+        if let request = HoursPeriodRequest(query: query) {
             if let provider = provider {
                 provider(chatID, query)
             } else {
                 handle(chatID: chatID, request: request, view: self)
             }
+            return nil
         } else if let request = HoursGroupRequest(query: query) {
-            let controller = HoursPeriodsController(env: env)
-            try controller.handle(chatID: chatID, messageID: messageID, request: request)
+            factory = HoursPeriodsRequestFactory(chatID: chatID, parentRequest: request)
         } else if let request = HoursDepartmentRequest(query: query) {
-            let controller = HoursGroupsController(env: env)
-            try controller.handle(chatID: chatID, messageID: messageID, request: request)
+            factory = HoursGroupsRequestFactory(chatID: chatID, parentRequest: request)
         } else if let request = HoursDepartmentsRequest(query: query) {
-            let controller = HoursDepartmentsController(env: env)
-            try controller.handle(chatID: chatID, messageID: messageID, request: request)
+            factory = HoursDepartmentsRequestFactory(chatID: chatID, parentRequest: request)
+        } else {
+            return nil
         }
+
+        let promise = env.worker.eventLoop.newPromise(InlineCommandsRequest.self)
+        promise.succeed(result: factory.request)
+        return promise.futureResult
     }
 }
 

@@ -55,46 +55,7 @@ class ParentController {
         }
     }
 
-    func send(chatID: Int64, messageID: Int?, text: String, keyboardMarkup: InlineKeyboardMarkup) throws {
-        Log.info("Send buttons chatID \(chatID) messageID \(String(describing: messageID))")
-
-        if let messageID = messageID {
-            let params = Bot.EditMessageReplyMarkupParams(chatId: .chat(chatID),
-                                                          messageId: messageID,
-                                                          inlineMessageId: nil,
-                                                          replyMarkup: keyboardMarkup)
-
-            try env.bot.editMessageReplyMarkup(params: params).whenSuccess({ [weak self] result in
-                switch result {
-                case .bool(let value):
-                    if !value, let self = self {
-                        self.send(chatID: chatID,
-                                  text: text,
-                                  markup: .inlineKeyboardMarkup(keyboardMarkup))
-                    }
-                case .message(_):
-                    Log.info("Complete replace message")
-                }
-            })
-        } else {
-            self.send(chatID: chatID,
-                      text: text,
-                      markup: .inlineKeyboardMarkup(keyboardMarkup))
-        }
-    }
-
-    func send(chatID: Int64, text: String, markup: ReplyMarkup? = nil) {
-        do {
-            if let markup = markup {
-                try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID),
-                                                                      text: text,
-                                                                      parseMode: .markdown,
-                                                                      replyMarkup: markup))
-            } else {
-                try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: text))
-            }
-        } catch {
-            Log.error("Error send message \(error.localizedDescription)")
-        }
+    func send(chatID: Int64, text: String) throws -> Future<Message> {
+        return try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: text))
     }
 }

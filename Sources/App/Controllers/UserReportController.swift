@@ -68,10 +68,10 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
         return "reports"
     }
 
-    func inline(query: String, chatID: Int64, messageID: Int?, provider: InlineCommandsProvider?) throws {
+    func inline(query: String, chatID: Int64, provider: InlineCommandsProvider?) throws -> Future<InlineCommandsRequest>? {
         Log.info("reports inline query \(query)")
 
-        try delegate?.inline(query: query, chatID: chatID, messageID: messageID, provider: { (chatID, query) in
+        return try delegate?.inline(query: query, chatID: chatID, provider: { (chatID, query) in
             if let provider = provider {
                 provider(chatID, query)
             } else {
@@ -95,7 +95,11 @@ extension UserReportController: HoursControllerView {
     func sendHours(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])]) {
         response.forEach { (info) in
             let report = displayData(timeEntries: info.1, user: info.0, date: date)
-            send(chatID: chatID, text: report)
+            do {
+                _ = try send(chatID: chatID, text: report)
+            } catch {
+                Log.error("\(error)")
+            }
         }
     }
 

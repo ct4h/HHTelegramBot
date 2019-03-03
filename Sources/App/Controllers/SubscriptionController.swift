@@ -44,8 +44,8 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
         return "sub"
     }
 
-    func inline(query: String, chatID: Int64, messageID: Int?, provider: InlineCommandsProvider?) throws {
-        Log.info("Subscription handle query \(query) chatID \(chatID) messageID \(String(describing: messageID))")
+    func inline(query: String, chatID: Int64, provider: InlineCommandsProvider?) throws -> Future<InlineCommandsRequest>? {
+        Log.info("Subscription handle query \(query) chatID \(chatID)")
 
         func check(_ child: InlineCommandsHandler) -> Bool {
             let pattern = "^\(inlineContext)/\(child.inlineContext)(.+)?$"
@@ -53,16 +53,14 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
             return query.matchRegexp(pattern: pattern)
         }
 
-        for child in childHandlers where check(child) {
-            try child.inline(query: query, chatID: chatID, messageID: messageID, provider: { [weak self] chatID, query in
-                guard let self = self else {
-                    return
-                }
-
-                self.saveQuery(chatID: chatID, query: query)
-                provider?(chatID, query)
-            })
+        let handler = childHandlers.first { (child) -> Bool in
+            return query.matchRegexp(pattern: "^\(inlineContext)/\(child.inlineContext)(.+)?$")
         }
+
+        return try handler?.inline(query: query, chatID: chatID, provider: { [weak self] chatID, query in
+            self?.saveQuery(chatID: chatID, query: query)
+            provider?(chatID, query)
+        })
     }
 
     // MARK: -
@@ -99,17 +97,14 @@ private extension SubscriptionController {
             return
         }
 
-        var buttons: [[InlineKeyboardButton]] = []
-        for child in childHandlers {
-            let callbackData = "\(inlineContext)/\(child.inlineContext)"
-            buttons.append([InlineKeyboardButton(text: child.inlineContext, callbackData: callbackData)])
-        }
+        let values = childHandlers.map { InlineButtonData(title: $0.inlineContext,
+                                                          query: "\(inlineContext)/\($0.inlineContext)") }
 
-        let title = "Выберите команду на которую хотите подписаться"
-        try send(chatID: chatID,
-                 messageID: nil,
-                 text: title,
-                 keyboardMarkup: InlineKeyboardMarkup(inlineKeyboard: buttons))
+        let request = InlineCommandsRequest(context: inlineContext,
+                                            title: "Выберите команду",
+                                            values: values)
+
+        try sendInlineCommands(chatID: chatID, request: request)
     }
 }
 
@@ -160,10 +155,10 @@ private extension SubscriptionController {
     func execute(subscriptions: [Subscription]) throws {
         for subscription in subscriptions {
             for child in childHandlers where child.check(query: subscription.query) {
-                try child.inline(query: subscription.query,
-                                 chatID: subscription.chatID,
-                                 messageID: nil,
-                                 provider: nil)
+                let promise = try child.inline(query: subscription.query, chatID: subscription.chatID, provider: nil)
+                promise?.whenComplete {
+                    Log.info("Успешно отработали подписку \(subscription.query) chatID: \(subscription.chatID)")
+                }
             }
         }
     }

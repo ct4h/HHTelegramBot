@@ -33,4 +33,8 @@ struct HoursGroupRequest {
     var query: String {
         return departmentRequest.query.appendURL(parameter: "g", value: group)
     }
+
+    var context: String {
+        return departmentRequest.context
+    }
 }
