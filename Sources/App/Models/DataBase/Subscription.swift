@@ -25,7 +25,6 @@ struct AddSubscriptionTime: PostgreSQLMigration {
 
     static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
         return Database.update(Subscription.self, on: conn) { builder in
-            Log.info("Migrate Subscription model")
             let defaultValue = PostgreSQLColumnConstraint.default(.literal(11), identifier: nil)
             builder.field(for: \.time, type: .int8, defaultValue)
         }
@@ -33,7 +32,6 @@ struct AddSubscriptionTime: PostgreSQLMigration {
 
     static func revert(on conn: PostgreSQLConnection) -> Future<Void> {
         return Database.update(Subscription.self, on: conn) { builder in
-            Log.info("Revert subscription model")
             builder.deleteField(for: \.time)
         }
     }

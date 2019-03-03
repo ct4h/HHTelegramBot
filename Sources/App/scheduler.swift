@@ -2,63 +2,40 @@ import Vapor
 import Jobs
 import LoggerAPI
 
-public struct SchedulerTime {
-    let hours: Int
-    let minute: Int
-    let dayOffset: Int?
-}
-
-public func schedulerDay(start: SchedulerTime, action: @escaping () -> Void) {
+public func schedulerHour(action: @escaping (Int8) -> Void) {
     guard let calendar = NSCalendar(identifier: .gregorian) else {
         Log.error("Calendar not found")
         return
     }
 
     var components = calendar.components([.year, .month, .day, .hour, .minute], from: Date())
-    components.hour = start.hours
-    components.minute = start.minute
+    components.hour = (components.hour ?? 0) + 1
+    components.minute = 0
 
-    if let offset = start.dayOffset {
-        components.day = (components.day ?? 1) + offset
-    }
-
-    startJob(start: start, date: calendar.date(from: components), interval: .days(1), action: action)
-}
-
-private func startJob(start: SchedulerTime, date: Date?, interval: Duration, action: @escaping () -> Void) {
-    guard let date = date else {
-        Log.error("Date not found")
+    guard let date = calendar.date(from: components) else {
+        Log.error("Fail create date")
         return
     }
 
-    let difference = date.timeIntervalSince(Date())
+    let delay = date.timeIntervalSince(Date())
+    Log.info("Start scheduler after delay \(delay)")
 
-    if difference > 0 {
-        Log.info("Start job after delay \(difference)")
-        startJob(delay: difference, interval: interval, action: action)
-    } else {
-        Log.info("Start job in next day \(difference)")
-        let nextDayStart = SchedulerTime(hours: start.hours, minute: start.minute, dayOffset: 1)
-        schedulerDay(start: nextDayStart, action: action)
+    Jobs.oneoff(delay: .seconds(delay)) {
+        startJob(interval: .hours(1), action: action)
     }
 }
 
-
-private func startJob(delay: Double, interval: Duration, action: @escaping () -> Void) {
-    if delay == 0 {
-        startJob(interval: interval, action: action)
-    } else {
-        Jobs.oneoff(delay: .seconds(delay)) {
-            startJob(interval: interval, action: action)
-        }
-    }
-}
-
-private func startJob(interval: Duration, action: @escaping () -> Void) {
+private func startJob(interval: Duration, action: @escaping (Int8) -> Void) {
     Log.info("schedule job by interval \(interval)")
 
     Jobs.add(interval: interval) {
         Log.info("job by interval \(interval)")
-        action()
+        if let hours = currentHours() {
+            action(Int8(hours))
+        }
     }
+}
+
+private func currentHours() -> Int? {
+    return NSCalendar(identifier: .gregorian)?.components([.hour], from: Date()).hour
 }
