@@ -86,12 +86,28 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
         Log.info("save query in db \(query) on time \(time)")
 
         let utcTime = time - 3
-        Subscription(chatID: chatID, query: query, period: SubscriptionPeriod.daily.rawValue, time: utcTime)
-            .save(on: DataBaseConnection(container: env.container))
-            .throwingSuccess({  [weak self] subscription in
+
+        env.container.newConnection(to: .psql).whenSuccess { (connection) in
+            let subscription = Subscription(chatID: chatID,
+                                            query: query,
+                                            period: SubscriptionPeriod.daily.rawValue,
+                                            time: utcTime)
+            let promise = subscription.save(on: connection)
+
+            promise.throwingSuccess({ [weak self] subscription in
+                connection.close()
+
                 let completeText = "Команда: \(query) успешно сохранена"
                 try self?.env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: completeText))
             })
+
+            promise.throwingFailure({ [weak self] (error) in
+                connection.close()
+
+                let errorText = "Не удалось сохранить команду \(query)\nError: \(error)"
+                try self?.env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: errorText))
+            })
+        }
     }
 }
 
@@ -133,23 +149,23 @@ private extension SubscriptionController {
             return
         }
 
-        let connection = DataBaseConnection(container: env.container)
+        env.container.newConnection(to: .psql).whenSuccess { (connection) in
+            let promise = Subscription
+                .query(on: connection)
+                .filter(\.chatID, .equal, chatID)
+                .delete()
 
-        let promise = Subscription
-            .query(on: connection)
-            .filter(\.chatID, .equal, chatID)
-            .delete()
+            promise.throwingSuccess { [weak self] in
+                connection.close()
 
-        promise.throwingSuccess { [weak self] in
-            _ = try self?.send(chatID: chatID, text: "Подписки удалены")
-        }
-
-        promise.whenFailure { [weak self] (error) in
-            do {
-                _ = try self?.send(chatID: chatID, text: "Не удалось удалить подписки")
-            } catch {
-                Log.error("\(error)")
+                _ = try self?.send(chatID: chatID, text: "Подписки удалены")
             }
+
+            promise.throwingFailure({ [weak self] (error) in
+                connection.close()
+
+                _ = try self?.send(chatID: chatID, text: "Не удалось удалить подписки")
+            })
         }
     }
 }
@@ -159,29 +175,35 @@ private extension SubscriptionController {
 private extension SubscriptionController {
 
     func executeSubscriptions(chatID: Int64?, time: Int8?) {
-        let connection = DataBaseConnection(container: env.container)
+        env.container.newConnection(to: .psql).whenSuccess { (connection) in
+            var builder: QueryBuilder<PostgreSQLDatabase, Subscription>
+            builder = Subscription.query(on: connection)
 
-        var builder: QueryBuilder<PostgreSQLDatabase, Subscription>
-        builder = Subscription.query(on: connection)
-
-        if let chatID = chatID {
-            builder = builder.filter(\.chatID, .equal, chatID)
-        }
-
-        if let time = time {
-            builder = builder.filter(\.time, .equal, time)
-        }
-
-        let promise = builder.all()
-
-        promise.throwingSuccess { [weak self] (subscriptions) in
-            try self?.execute(subscriptions: subscriptions)
-        }
-
-        promise.whenFailure { [weak self] (error) in
             if let chatID = chatID {
-                let errorText = "Не удалось выполнить запрос к базе"
-                self?.sendIn(chatID: chatID, text: errorText, error: error)
+                builder = builder.filter(\.chatID, .equal, chatID)
+            }
+
+            if let time = time {
+                builder = builder.filter(\.time, .equal, time)
+            }
+
+            let promise = builder.all()
+
+            promise.throwingSuccess { [weak self] (subscriptions) in
+                connection.close()
+
+                try self?.execute(subscriptions: subscriptions)
+            }
+
+            promise.whenFailure { [weak self] (error) in
+                connection.close()
+
+                if let chatID = chatID {
+                    let errorText = "Не удалось выполнить запрос к базе"
+                    self?.sendIn(chatID: chatID, text: errorText, error: error)
+                } else {
+                    Log.error("Не удалось извлечь данные \(error)")
+                }
             }
         }
     }

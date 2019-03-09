@@ -7,6 +7,7 @@
 
 import Foundation
 import NIO
+import LoggerAPI
 
 private struct EventLoopFutureError: Error {
 }
@@ -33,6 +34,17 @@ extension EventLoopFuture {
             do {
                 try callback(value)
             } catch {
+                Log.error("\(error)")
+            }
+        }
+    }
+
+    func throwingFailure(_ callback: @escaping (Error) throws -> Void) {
+        whenFailure { (error) in
+            do {
+                try callback(error)
+            } catch {
+                Log.error("\(error)")
             }
         }
     }
