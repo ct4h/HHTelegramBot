@@ -13,4 +13,14 @@ class Storage {
     var users: [FullUser] = []
 
     private init() {}
+
+    func search(nickname: String) -> Bool {
+        let user = users.first(where: { (user) -> Bool in
+            let field = user.custom_fields.first(where: { (field) -> Bool in
+                return field.name == "Telegram аккаунт"
+            })
+            return field?.value == nickname
+        })
+        return user != nil
+    }
 }

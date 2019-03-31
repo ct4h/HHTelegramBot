@@ -26,8 +26,8 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
 
     // MARK: - CommandsHandler
 
-    var handlers: [CommandHandler] {
-        return [CommandHandler(commands: ["/dayReport"], callback: userReport)]
+    var handlers: [Handler] {
+        return [AuthCommandHandler(bot: env.bot, commands: ["/dayReport"], callback: userReport)]
     }
 
     private func userReport(_ update: Update, _ context: BotContext?) throws {

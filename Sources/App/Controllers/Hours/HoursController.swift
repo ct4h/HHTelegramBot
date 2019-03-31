@@ -30,8 +30,8 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
 
     // MARK: - CommandsHandler
 
-    var handlers: [CommandHandler] {
-        return [CommandHandler(commands: ["/hours"], callback: loadHours)]
+    var handlers: [Handler] {
+        return [AuthCommandHandler(bot: env.bot, commands: ["/hours"], callback: loadHours)]
     }
     
     private func loadHours(_ update: Update, _ context: BotContext?) throws {

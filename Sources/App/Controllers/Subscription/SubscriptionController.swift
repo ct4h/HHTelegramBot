@@ -30,11 +30,11 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
 
     // MARK: - CommandsHandler
 
-    var handlers: [CommandHandler] {
+    var handlers: [Handler] {
         return [
-            CommandHandler(commands: ["/subscription"], callback: subscription),
-            CommandHandler(commands: ["/force"], callback: forceExecute),
-            CommandHandler(commands: ["/clear"], callback: remove)
+            AuthCommandHandler(bot: env.bot, commands: ["/subscription"], callback: subscription),
+            AuthCommandHandler(bot: env.bot, commands: ["/force"], callback: forceExecute),
+            AuthCommandHandler(bot: env.bot, commands: ["/clear"], callback: remove)
         ]
     }
 

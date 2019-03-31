@@ -23,7 +23,7 @@ class UsersController: ParentController, CommandsHandler {
 
     // MARK: - CommandsHandler
 
-    var handlers: [CommandHandler] {
+    var handlers: [Handler] {
         return [CommandHandler(commands: ["/refreshUsers"], callback: refreshUsers)]
     }
 

@@ -69,6 +69,16 @@ extension InlineCommandsHandler where Self: ParentController {
         let chatID = message.chat.id
         let messageID = message.messageId
 
+        guard let username = message.from?.username, Storage.shared.search(nickname: username) else {
+            do {
+                let errorMessage = "Access denied"
+                try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: errorMessage))
+            } catch {
+                Log.info("error \(error)")
+            }
+            return
+        }
+
         try deleteMessage(chatID: chatID, messageID: message.messageId)
             .thenFuture { (_) -> Future<InlineCommandsRequest>? in
                 if let query = InlineCommandsBuffer.shared.query(callbackData: data) {

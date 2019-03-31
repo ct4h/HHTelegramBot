@@ -9,5 +9,5 @@ import Foundation
 import Telegrammer
 
 protocol CommandsHandler {
-    var handlers: [CommandHandler] { get }
+    var handlers: [Handler] { get }
 }

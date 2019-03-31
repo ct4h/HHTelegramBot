@@ -47,7 +47,7 @@ final class RedmineBot: ServiceType {
         let dispatcher = Dispatcher(bot: bot)
 
         commandHandlers
-            .reduce([]) { (result, handler) -> [CommandHandler] in
+            .reduce([]) { (result, handler) -> [Handler] in
                 var result = result
                 result.append(contentsOf: handler.handlers)
                 return result
