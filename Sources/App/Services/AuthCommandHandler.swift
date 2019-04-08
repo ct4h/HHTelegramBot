@@ -35,15 +35,15 @@ class AuthCommandHandler: Handler {
         }
 
         if Storage.shared.search(nickname: username) {
+            return true
+        } else {
             do {
                 let errorMessage = "Access denied"
                 try bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(message.chat.id), text: errorMessage))
             } catch {
                 Log.info("error \(error)")
             }
-
-            return true
-        } else {
+            
             return false
         }
     }
