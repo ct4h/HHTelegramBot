@@ -10,7 +10,7 @@ import Foundation
 struct TimeEntries: Decodable {
     let id: Int
     let hours: Double
-    let comments: String
+    let comments: String?
     let user: ShortUser
     let project: Project
     let activity: TimeEntries.Activity
