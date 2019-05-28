@@ -196,14 +196,18 @@ private extension UserReportController {
                 }
             }
 
-            let projectsSeparator = "\n\n---------------------------\n\n"
-
+            let projectsSeparator = "\n\n"
             let userString = "*[\(date)] \(user.lastname) \(user.firstname): \(projectsTime)*\n\n\(projectsStrings.joined(separator: projectsSeparator))"
             usersStrings.append(userString)
         }
 
-        let usersSeparator = "\n\n===========================\n\n"
-        let result = usersStrings.joined(separator: usersSeparator)
-        return result
+        let usersSeparator = "***************************"
+
+        if usersStrings.count == 1 {
+            let userFeedback = usersStrings.first ?? ""
+            return userFeedback + "\n\n" + usersSeparator
+        } else {
+            return usersStrings.joined(separator: "\n\n\(usersSeparator)\n\n")
+        }
     }
 }
