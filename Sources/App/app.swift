@@ -1,4 +1,5 @@
 import Vapor
+import LoggerAPI
 
 public func app(_ env: Environment) throws -> Application {
     var config = Config.default()

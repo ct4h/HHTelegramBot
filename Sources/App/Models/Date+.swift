@@ -16,9 +16,29 @@ extension Date {
     var stringYYYYMMdd: String {
         return DateFormatter.yyyyMMdd.string(from: self)
     }
+
+    var range: (prev: Date, next: Date)? {
+        guard let calendar = NSCalendar(identifier: .gregorian) else {
+            return nil
+        }
+
+        var components = calendar.components([.year, .month, .day], from: self)
+
+        guard let prevDate = calendar.date(from: components) else {
+            return nil
+        }
+
+        components.day = (components.day ?? 0) + 1
+
+        guard let nextDate = calendar.date(from: components) else {
+            return nil
+        }
+
+        return (prevDate, nextDate)
+    }
 }
 
-private extension DateFormatter {
+extension DateFormatter {
 
     static var yyyyMMdd: DateFormatter {
         let formatter = DateFormatter()

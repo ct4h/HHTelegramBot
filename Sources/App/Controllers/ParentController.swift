@@ -56,6 +56,6 @@ class ParentController {
     }
 
     func send(chatID: Int64, text: String) throws -> Future<Message> {
-        return try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: text))
+        return try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: text, parseMode: .markdown))
     }
 }

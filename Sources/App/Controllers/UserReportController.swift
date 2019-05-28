@@ -9,57 +9,94 @@ import Foundation
 import Telegrammer
 import Async
 import LoggerAPI
+import Fluent
+import FluentSQL
+import MySQL
 
 /**
  Контроллер формирует отчет по конкретному человеку
  */
 class UserReportController: ParentController, CommandsHandler, InlineCommandsHandler {
 
-    private lazy var paginationManager = {
-        return PaginationManager<TimeEntriesResponse>(host: env.constants.redmine.domain,
-                                                      port: env.constants.redmine.port,
-                                                      access: env.constants.redmine.access,
-                                                      worker: env.worker)
-    }()
-
     weak var delegate: HoursControllerProvider?
 
     // MARK: - CommandsHandler
 
     var handlers: [Handler] {
-        return [AuthCommandHandler(bot: env.bot, commands: ["/dayReport"], callback: userReport)]
+        return [CommandHandler(commands: ["/dayReport"], callback: userReport)]
+//        return [AuthCommandHandler(bot: env.bot, commands: ["/dayReport"], callback: userReport)]
     }
 
     private func userReport(_ update: Update, _ context: BotContext?) throws {
-        guard let message = update.message, let from = message.from else {
+        guard let message = update.message, let from = message.from, let username = from.username else {
             send(text: "Не удалось определить пользователя", updater: update)
             return
         }
 
-        guard let user = searchUser(nickname: from.username) else {
-            send(text: "Не удалось найти пользователя \(String(describing: from.username))", updater: update)
+        let reportDate = Date()
+
+        guard let rangeDate = reportDate.range else {
             return
         }
 
-        let date = Date.stringYYYYMMdd
+        Log.info("Диапозон \(rangeDate)")
 
-        let promise = paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
-            return RedmineRequest.timeEntries(userID: user.id, date: date, offset: offset, limit: limit)
-        })
+        env.container.newConnection(to: .mysql).whenSuccess { (connection) in
+            _ = self.requestUsers(on: connection, username: username).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
+                let builder = User.query(on: connection)
+                    .filter(\User.status == 1)
+                    .join(\CustomValue.customized_id, to: \User.id)
+                    .join(\CustomField.id, to: \CustomValue.custom_field_id)
+                    .filter(\CustomField.name, .equal, "Telegram аккаунт")
+                    .filter(\CustomValue.value, .equal, username)
+                    .join(\TimeEntries.user_id, to: \User.id)
+                    .filter(\TimeEntries.updated_on >= rangeDate.prev)
+                    .filter(\TimeEntries.updated_on <= rangeDate.next)
+                    .join(\Issue.id, to: \TimeEntries.issue_id)
+                    .join(\Project.id, to: \TimeEntries.project_id)
+                    .alsoDecode(TimeEntries.self)
+                    .alsoDecode(Issue.self)
+                    .alsoDecode(Project.self)
 
-        promise.whenSuccess { [weak self] timeEntries in
-            guard let self = self else {
-                return
+                let promise = builder.all()
+
+                promise.throwingSuccess { (result) in
+                    connection.close()
+
+                    let response = result.hoursResponse
+
+                    var result: DBHoursResponse = [:]
+
+                    for user in users {
+                        result[user] = response[user] ?? [:]
+                    }
+
+                    let text = self.prepareToDisplay(data: result, date: reportDate.stringYYYYMMdd)
+                    Log.info("Convert to text \(text)")
+                    _ = try self.send(chatID: message.chat.id, text: text)
+                }   
+
+                promise.whenFailure { (error) in
+                    connection.close()
+
+                    let errorText = "Не удалось выполнить запрос к базе"
+                    self.sendIn(chatID: message.chat.id, text: errorText, error: error)
+                }
+
+                return promise
             }
-
-            let report = self.displayData(timeEntries: timeEntries, user: user, date: date)
-            self.send(text: report, updater: update)
         }
+    }
 
-        promise.whenFailure { [weak self] error in
-            let text = "Не удалось выполнить команду /dayReport"
-            self?.sendIn(chatID: message.chat.id, text: text, error: error)
-        }
+    private func requestUsers(on connection: MySQLConnection, username: String) -> Future<[User]> {
+        let builder = User.query(on: connection)
+            .filter(\User.status == 1)
+            .join(\CustomValue.customized_id, to: \User.id)
+            .join(\CustomField.id, to: \CustomValue.custom_field_id)
+            .filter(\CustomField.name, .equal, "Telegram аккаунт")
+            .filter(\CustomValue.value, .equal, username)
+
+        return builder.all()
     }
 
     // MARK: - InlineCommandsHandler
@@ -92,14 +129,17 @@ private extension UserReportController {
 
 extension UserReportController: HoursControllerView {
 
-    func sendHours(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])]) {
-        response.forEach { (info) in
-            let report = displayData(timeEntries: info.1, user: info.0, date: date)
-            do {
-                _ = try send(chatID: chatID, text: report)
-            } catch {
-                Log.error("\(error)")
+    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: Date, response: DBHoursResponse) {
+        let dateString = date.stringYYYYMMdd
+
+        do {
+            for (user, projects) in response {
+                let userData = [user: projects]
+                let text = self.prepareToDisplay(data: userData, date: dateString)
+                _ = try self.send(chatID: chatID, text: text)
             }
+        } catch {
+            Log.error("\(error)")
         }
     }
 
@@ -113,58 +153,59 @@ extension UserReportController: HoursControllerView {
 
 private extension UserReportController {
 
-    func searchUser(nickname: String?) -> FullUser? {
-        guard let nickname = nickname else {
-            return nil
-        }
+    func prepareToDisplay(data: DBHoursResponse, date: String) -> String {
+        var usersStrings: [String] = []
 
-        for user in Storage.shared.users {
-            for field in user.custom_fields where field.value == nickname {
-                return user
-            }
-        }
+        for (user, projects) in data {
+            let sortedProjects = projects.keys.sorted(by: { $0.name < $1.name })
 
-        return nil
-    }
+            var projectsStrings: [String] = []
+            var projectsTime: Float = 0
 
-    func displayData(timeEntries: [TimeEntries], user: FullUser, date: String) -> String {
-        var totalHours: Double = 0
-        var reportProjects: [Project: [String]] = [:]
+            for project in sortedProjects {
+                Log.info("project \(project.name)")
 
-        for timeEntry in timeEntries {
-            var comments: [String] = []
+                if let issues = projects[project] {
+                    let sortedIssues = issues.keys.sorted(by: { ($0.id ?? 0) < ($1.id ?? 0) })
 
-            if let values = reportProjects[timeEntry.project] {
-                comments = values
-            }
+                    var issuesStrings: [String] = []
+                    var issuesTime: Float = 0
 
-            totalHours += timeEntry.hours
-            let comment = "[\(timeEntry.activity.name)] \(timeEntry.comments ?? "-")"
-            comments.append(comment)
-            reportProjects[timeEntry.project] = comments
-        }
+                    for issue in sortedIssues {
+                        var timeEntriesString: String = "Без комментариев"
+                        var timeEntriesTime: Float = 0
 
-        let separator = "*******************************"
+                        if let timeEntries = issues[issue] {
+                            timeEntriesString = timeEntries
+                                .sorted(by: { ($0.id ?? 0) < ($1.id ?? 0) })
+                                .map({ " • " + $0.comments })
+                                .joined(separator: "\n")
+                            timeEntriesTime = timeEntries.reduce(0, { $0 + $1.hours })
+                        }
 
-        let projects = reportProjects.keys.sorted(by: { $0.name < $1.name })
-        var reports: [String] = []
-        for project in projects {
-            if let values = reportProjects[project] {
-                var comments = values.joined(separator: "\n")
-                if comments.isEmpty {
-                    comments = "Без комментариев"
+                        if let issueId = issue.id {
+                            let issueString = "> [PM-\(issueId)](https://pm.handh.ru/issues/\(issueId)) | \(issue.subject) \(timeEntriesTime)h:\n\(timeEntriesString)"
+                            issuesStrings.append(issueString)
+                        }
+
+                        issuesTime += timeEntriesTime
+                    }
+
+                    let projectString = "*\(project.name) \(issuesTime)h:*\n\(issuesStrings.joined(separator: "\n"))"
+                    projectsStrings.append(projectString)
+
+                    projectsTime += issuesTime
                 }
-                let report = project.name + "\n" + comments + "\n" + separator
-                reports.append(report)
             }
+
+            let projectsSeparator = "\n\n---------------------------\n\n"
+
+            let userString = "*[\(date)] \(user.lastname) \(user.firstname): \(projectsTime)*\n\n\(projectsStrings.joined(separator: projectsSeparator))"
+            usersStrings.append(userString)
         }
 
-        var report = "[\(date)] \(user.name): \(totalHours)"
-        if !reports.isEmpty {
-            report = report + "\n\n" + separator + "\n" + reports.joined(separator: "\n\n\(separator)\n")
-        }
-
-        return report
+        let usersSeparator = "\n\n===========================\n\n"
+        let result = usersStrings.joined(separator: usersSeparator)
+        return result
     }
 }
-

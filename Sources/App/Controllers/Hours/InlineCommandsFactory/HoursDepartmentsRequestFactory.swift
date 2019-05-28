@@ -6,43 +6,50 @@
 //
 
 import Foundation
+import Vapor
+import FluentSQL
 
 class HoursDepartmentsRequestFactory: InlineCommandsRequestFactory {
 
     let chatID: Int64
     let parentRequest: HoursDepartmentsRequest
+    let container: Container
 
-    init(chatID: Int64, parentRequest: HoursDepartmentsRequest) {
+    init(chatID: Int64, parentRequest: HoursDepartmentsRequest,container: Container) {
         self.chatID = chatID
         self.parentRequest = parentRequest
+        self.container = container
     }
 
-    var request: InlineCommandsRequest {
-        let values = departments.map { (department) -> InlineButtonData in
-            let query = HoursDepartmentRequest(departmentsRequest: parentRequest, department: department).query
-            return InlineButtonData(title: department, query: query)
-        }
+    var request: Future<InlineCommandsRequest> {
+        let parentRequest = self.parentRequest
+        let title = self.title
 
-        return InlineCommandsRequest(context: parentRequest.context,
-                                     title: title,
-                                     values: values)
+        return customFields.map { (customFields) -> InlineCommandsRequest in
+            let values = customFields.map { (customField) -> InlineButtonData in
+                let query = HoursDepartmentRequest(departmentsRequest: parentRequest, department: customField).query
+                return InlineButtonData(title: customField, query: query)
+            }
+
+            return InlineCommandsRequest(context: parentRequest.context,
+                                         title: title,
+                                         values: values)
+        }
     }
 }
 
 private extension HoursDepartmentsRequestFactory {
 
-    var departments: [String] {
-        var fields: Set<String> = []
+    var customFields: Future<[String]> {
+        return container.newConnection(to: .mysql)
+            .flatMap { (connection) -> EventLoopFuture<[CustomField]> in
+                let builder = CustomField.query(on: connection)
+                    .filter(\CustomField.type == "UserCustomField")
+                    .filter(\CustomField.field_format == "list")
+                    .sort(\.name, .ascending)
 
-        for user in Storage.shared.users {
-            for field in user.custom_fields {
-                fields.insert(field.name)
-            }
-        }
-
-        var objects = Array(fields)
-        objects.sort(by: { $0 < $1 })
-        return objects
+                return builder.all()
+            }.map { $0.map { $0.name } }
     }
 
     var title: String {

@@ -6,26 +6,40 @@
 //
 
 import Foundation
+import Vapor
 
 class HoursPeriodsRequestFactory: InlineCommandsRequestFactory {
 
     let chatID: Int64
     let parentRequest: HoursGroupRequest
+    let worker: Worker
 
-    init(chatID: Int64, parentRequest: HoursGroupRequest) {
+    init(chatID: Int64, parentRequest: HoursGroupRequest, worker: Worker) {
         self.chatID = chatID
         self.parentRequest = parentRequest
+        self.worker = worker
     }
 
-    var request: InlineCommandsRequest {
-        let values = periods.map { (period) -> InlineButtonData in
-            let query = HoursPeriodRequest(groupRequest: parentRequest, period: period).query
-            return InlineButtonData(title: period.title, query: query)
+    var request: Future<InlineCommandsRequest> {
+        let periods = self.periods
+        let parentRequest = self.parentRequest
+        let title = self.title
+
+        let promise = worker.eventLoop.newPromise(InlineCommandsRequest.self)
+
+        worker.eventLoop.execute {
+            let values = periods.map { (period) -> InlineButtonData in
+                let query = HoursPeriodRequest(groupRequest: parentRequest, period: period).query
+                return InlineButtonData(title: period.title, query: query)
+            }
+
+            let request = InlineCommandsRequest(context: parentRequest.context,
+                                                title: title,
+                                                values: values)
+            promise.succeed(result: request)
         }
 
-        return InlineCommandsRequest(context: parentRequest.context,
-                                     title: title,
-                                     values: values)
+        return promise.futureResult
     }
 }
 

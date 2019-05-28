@@ -32,10 +32,16 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
 
     var handlers: [Handler] {
         return [
-            AuthCommandHandler(bot: env.bot, commands: ["/subscription"], callback: subscription),
-            AuthCommandHandler(bot: env.bot, commands: ["/force"], callback: forceExecute),
-            AuthCommandHandler(bot: env.bot, commands: ["/clear"], callback: remove)
+            CommandHandler(commands: ["/subscription"], callback: subscription),
+            CommandHandler(commands: ["/force"], callback: forceExecute),
+            CommandHandler(commands: ["/clear"], callback: remove)
         ]
+
+//        return [
+//            AuthCommandHandler(bot: env.bot, commands: ["/subscription"], callback: subscription),
+//            AuthCommandHandler(bot: env.bot, commands: ["/force"], callback: forceExecute),
+//            AuthCommandHandler(bot: env.bot, commands: ["/clear"], callback: remove)
+//        ]
     }
 
     // MARK: - InlineCommandsHandler
@@ -71,10 +77,8 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
         if let childPromise = childPromise {
             return childPromise
         } else {
-            let factory = SubscriptionTimeRequestFactory(chatID: chatID, callbackData: query)
-            let promise = env.worker.eventLoop.newPromise(InlineCommandsRequest.self)
-            promise.succeed(result: factory.request)
-            return promise.futureResult
+            let factory = SubscriptionTimeRequestFactory(chatID: chatID, callbackData: query, worker: env.worker)
+            return factory.request
         }
     }
 

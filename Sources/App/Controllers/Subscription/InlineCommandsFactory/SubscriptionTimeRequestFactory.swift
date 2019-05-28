@@ -6,26 +6,41 @@
 //
 
 import Foundation
+import Vapor
 
 class SubscriptionTimeRequestFactory: InlineCommandsRequestFactory {
 
     let chatID: Int64
     let callbackData: String
+    let worker: Worker
 
-    init(chatID: Int64, callbackData: String) {
+    init(chatID: Int64, callbackData: String, worker: Worker) {
         self.chatID = chatID
         self.callbackData = callbackData
+        self.worker = worker
     }
 
-    var request: InlineCommandsRequest {
-        let values = times.map { (time) -> InlineButtonData in
-            let query = SubscriptionTimeRequest(callbackData: callbackData, time: time).query
-            return InlineButtonData(title: "\(time):00", query: query)
+    var request: Future<InlineCommandsRequest> {
+        let times = self.times
+        let callbackData = self.callbackData
+        let title = self.title
+
+        let promise = worker.eventLoop.newPromise(InlineCommandsRequest.self)
+
+        worker.eventLoop.execute {
+            let values = times.map { (time) -> InlineButtonData in
+                let query = SubscriptionTimeRequest(callbackData: callbackData, time: time).query
+                return InlineButtonData(title: "\(time):00", query: query)
+            }
+
+            let request = InlineCommandsRequest(context: callbackData.urlPath ?? callbackData,
+                                         title: title,
+                                         values: values)
+            
+            promise.succeed(result: request)
         }
 
-        return InlineCommandsRequest(context: callbackData.urlPath ?? callbackData,
-                                     title: title,
-                                     values: values)
+        return promise.futureResult
     }
 }
 

@@ -1,5 +1,6 @@
 import Vapor
 import Telegrammer
+import LoggerAPI
 
 private var botService: RedmineBot?
 
@@ -13,15 +14,15 @@ private func start(bot: RedmineBot?) throws {
         return
     }
 
-    print("Start bot")
-
     let pollingPromise = try bot.updater?.startLongpolling()
     pollingPromise?.catch({ error in
-        print("Longpolling error \(error)")
+        Log.error("Longpolling error \(error)")
+
         do {
+            Log.info("Restart bot")
             try start(bot: bot)
         } catch {
-            print("Fail restart bot")
+            Log.error("Fail restart bot")
         }
     })
 }

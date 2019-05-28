@@ -6,43 +6,54 @@
 //
 
 import Foundation
+import Vapor
+import FluentSQL
 
 class HoursGroupsRequestFactory: InlineCommandsRequestFactory {
 
     let chatID: Int64
     let parentRequest: HoursDepartmentRequest
+    let container: Container
 
-    init(chatID: Int64, parentRequest: HoursDepartmentRequest) {
+    init(chatID: Int64, parentRequest: HoursDepartmentRequest, container: Container) {
         self.chatID = chatID
         self.parentRequest = parentRequest
+        self.container = container
     }
 
-    var request: InlineCommandsRequest {
-        let values = groups(department: parentRequest.department).map { (group) -> InlineButtonData in
-            let query = HoursGroupRequest(departmentRequest: parentRequest, group: group).query
-            return InlineButtonData(title: group, query: query)
-        }
+    var request: Future<InlineCommandsRequest> {
+        let parentRequest = self.parentRequest
+        let title = self.title
 
-        return InlineCommandsRequest(context: parentRequest.context,
-                                     title: title,
-                                     values: values)
+        return groups(customFieldName: parentRequest.department).map{ (groups) -> InlineCommandsRequest in
+            let values = groups.map { (group) -> InlineButtonData in
+                let query = HoursGroupRequest(departmentRequest: parentRequest, group: group).query
+                return InlineButtonData(title: group, query: query)
+            }
+
+            return InlineCommandsRequest(context: parentRequest.context,
+                                         title: title,
+                                         values: values)
+        }
     }
 }
 
 private extension HoursGroupsRequestFactory {
 
-    func groups(department: String) -> [String] {
-        var values: Set<String> = []
-
-        for user in Storage.shared.users {
-            for userField in user.custom_fields where userField.name == department && userField.value != "" {
-                values.insert(userField.value)
+    func groups(customFieldName: String) -> Future<[String]> {
+        return container.newConnection(to: .mysql)
+            .flatMap { (connection) -> EventLoopFuture<[CustomField]> in
+                let builder = CustomField.query(on: connection)
+                    .filter(\.name == customFieldName)
+                return builder.all()
             }
-        }
+            .map{ (customFields) -> [String] in
+                guard let customField = customFields.first else {
+                    return []
+                }
 
-        var objects = Array(values)
-        objects.sort(by: { $0 < $1 })
-        return objects
+                return customField.values
+            }
     }
 
     var title: String {

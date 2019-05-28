@@ -1,13 +1,13 @@
 import Foundation
 import Telegrammer
 import Vapor
+import LoggerAPI
 
 final class RedmineBot: ServiceType {
 
     private let bot: Bot
     private let worker: Worker = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-    private let usersControllers: UsersController
     private let hoursControllers: HoursController
     private let userReportControllers: UserReportController
     private let subscriptionController: SubscriptionController
@@ -26,8 +26,6 @@ final class RedmineBot: ServiceType {
         bot = try Bot(settings: settings)
 
         let controllerEnv = BotControllerEnv(bot: bot, constants: constants, worker: worker, container: container)
-
-        usersControllers = UsersController(env: controllerEnv)
 
         hoursControllers = HoursController(env: controllerEnv)
 
@@ -62,7 +60,7 @@ final class RedmineBot: ServiceType {
     // MARK: - Helpers
 
     private var commandHandlers: [CommandsHandler] {
-        return [usersControllers, hoursControllers, userReportControllers, subscriptionController]
+        return [hoursControllers, userReportControllers, subscriptionController]
     }
 
     private var inlineCommmandHandlers: [InlineCommandsHandler] {

@@ -23,7 +23,7 @@ struct InlineButtonData {
 }
 
 protocol InlineCommandsRequestFactory {
-    var request: InlineCommandsRequest { get }
+    var request: Future<InlineCommandsRequest> { get }
 }
 
 protocol InlineCommandsHandler: class {
@@ -69,15 +69,16 @@ extension InlineCommandsHandler where Self: ParentController {
         let chatID = message.chat.id
         let messageID = message.messageId
 
-        guard let username = message.from?.username, Storage.shared.search(nickname: username) else {
-            do {
-                let errorMessage = "Access denied"
-                try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: errorMessage))
-            } catch {
-                Log.info("error \(error)")
-            }
-            return
-        }
+        // TODO: Вернуть проверку на пользователя
+//        guard let username = message.from?.username, Storage.shared.search(nickname: username) else {
+//            do {
+//                let errorMessage = "Access denied"
+//                try env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: errorMessage))
+//            } catch {
+//                Log.info("error \(error)")
+//            }
+//            return
+//        }
 
         try deleteMessage(chatID: chatID, messageID: message.messageId)
             .thenFuture { (_) -> Future<InlineCommandsRequest>? in

@@ -9,9 +9,11 @@ import Foundation
 import Telegrammer
 import Async
 import LoggerAPI
+import FluentSQL
+import MySQL
 
 protocol HoursControllerView {
-    func sendHours(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])])
+    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: Date, response: DBHoursResponse)
     func sendHours(chatID: Int64, error: Error)
 }
 
@@ -21,17 +23,11 @@ protocol HoursControllerProvider: InlineCommandsHandler {
 
 class HoursController: ParentController, CommandsHandler, InlineCommandsHandler {
 
-    private lazy var paginationManager = {
-        return PaginationManager<TimeEntriesResponse>(host: env.constants.redmine.domain,
-                                                      port: env.constants.redmine.port,
-                                                      access: env.constants.redmine.access,
-                                                      worker: env.worker)
-    }()
-
     // MARK: - CommandsHandler
 
     var handlers: [Handler] {
-        return [AuthCommandHandler(bot: env.bot, commands: ["/hours"], callback: loadHours)]
+        return [CommandHandler(commands: ["/hours"], callback: loadHours)]
+//        return [AuthCommandHandler(bot: env.bot, commands: ["/hours"], callback: loadHours)]
     }
     
     private func loadHours(_ update: Update, _ context: BotContext?) throws {
@@ -63,18 +59,16 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
             }
             return nil
         } else if let request = HoursGroupRequest(query: query) {
-            factory = HoursPeriodsRequestFactory(chatID: chatID, parentRequest: request)
+            factory = HoursPeriodsRequestFactory(chatID: chatID, parentRequest: request, worker: env.worker)
         } else if let request = HoursDepartmentRequest(query: query) {
-            factory = HoursGroupsRequestFactory(chatID: chatID, parentRequest: request)
+            factory = HoursGroupsRequestFactory(chatID: chatID, parentRequest: request, container: env.container)
         } else if let request = HoursDepartmentsRequest(query: query) {
-            factory = HoursDepartmentsRequestFactory(chatID: chatID, parentRequest: request)
+            factory = HoursDepartmentsRequestFactory(chatID: chatID, parentRequest: request, container: env.container)
         } else {
             return nil
         }
 
-        let promise = env.worker.eventLoop.newPromise(InlineCommandsRequest.self)
-        promise.succeed(result: factory.request)
-        return promise.futureResult
+        return factory.request
     }
 }
 
@@ -89,20 +83,67 @@ extension HoursController: HoursControllerProvider {
     }
 
     private func handle(chatID: Int64, request: HoursPeriodRequest, view: HoursControllerView) {
-        let userField = FullUserField(name: request.groupRequest.departmentRequest.department,
-                                      value: request.groupRequest.group)
-        let users = self.users(userField: userField)
-        let date = self.date(request: request)
+        let reportDate = date(request: request)
 
-        let promise = timeEntries(users: users, date: date)
-
-        promise.whenSuccess { (response) in
-            view.sendHours(chatID: chatID, filter: userField, date: date, response: response)
+        guard let rangeDate = reportDate.range else {
+            return
         }
 
-        promise.whenFailure { (error) in
-            view.sendHours(chatID: chatID, error: error)
+        Log.info("Диапозон \(rangeDate)")
+
+        env.container.newConnection(to: .mysql).whenSuccess { (connection) in
+            _ = self.requestUsers(on: connection, payload: request).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
+                let builder = User.query(on: connection)
+                    .filter(\User.status == 1)
+                    .join(\CustomValue.customized_id, to: \User.id)
+                    .join(\CustomField.id, to: \CustomValue.custom_field_id)
+                    .filter(\CustomField.name, .equal, request.groupRequest.departmentRequest.department)
+                    .filter(\CustomValue.value, .equal, request.groupRequest.group)
+                    .join(\TimeEntries.user_id, to: \User.id)
+                    .filter(\TimeEntries.updated_on >= rangeDate.prev)
+                    .filter(\TimeEntries.updated_on <= rangeDate.next)
+                    .join(\Issue.id, to: \TimeEntries.issue_id)
+                    .join(\Project.id, to: \TimeEntries.project_id)
+                    .alsoDecode(TimeEntries.self)
+                    .alsoDecode(Issue.self)
+                    .alsoDecode(Project.self)
+
+                let promise = builder.all()
+
+                promise.throwingSuccess { (result) in
+                    connection.close()
+
+                    let response = result.hoursResponse
+
+                    var result: DBHoursResponse = [:]
+
+                    for user in users {
+                        result[user] = response[user] ?? [:]
+                    }
+
+                    view.sendHours(chatID: chatID, request: request, date: reportDate, response: result)
+                }
+
+                promise.whenFailure { (error) in
+                    connection.close()
+
+                    view.sendHours(chatID: chatID, error: error)
+                }
+
+                return promise
+            }
         }
+    }
+
+    private func requestUsers(on connection: MySQLConnection, payload: HoursPeriodRequest) -> Future<[User]> {
+        let builder = User.query(on: connection)
+            .filter(\User.status == 1)
+            .join(\CustomValue.customized_id, to: \User.id)
+            .join(\CustomField.id, to: \CustomValue.custom_field_id)
+            .filter(\CustomField.name, .equal, payload.groupRequest.departmentRequest.department)
+            .filter(\CustomValue.value, .equal, payload.groupRequest.group)
+
+        return builder.all()
     }
 }
 
@@ -110,22 +151,39 @@ extension HoursController: HoursControllerProvider {
 
 extension HoursController: HoursControllerView {
 
-    func sendHours(chatID: Int64, filter: FullUserField, date: String, response: [(FullUser, [TimeEntries])]) {
+    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: Date, response: DBHoursResponse) {
         guard chatID != 0 else {
             return
         }
 
-        let items = response.map { (user, timeEntries) -> String in
-            let time = timeEntries.reduce(0, { $0 + $1.hours} )
+        var usersInfo: [User: [TimeEntries]] = [:]
+
+        for (user, projects) in response {
+            usersInfo[user] = []
+
+            for (_, issues) in projects {
+                usersInfo[user] = Array(issues.values).reduce([], +)
+            }
+        }
+
+        var users = Array(usersInfo.keys)
+        users.sort(by: { $0.name < $1.name })
+
+        let items = users.map { (user) -> String in
+            let timeEntries = usersInfo[user] ?? []
+            let time = Double(timeEntries.reduce(0, { $0 + $1.hours}))
             return "\(time.hoursIcon) \(user.name): \(time.format())"
         }
 
-        let text = "Отчет \(filter.name): \(filter.value) за \(date)\n\n" + items.joined(separator: "\n")
+        let department = request.groupRequest.departmentRequest.department
+        let group = request.groupRequest.group
+
+        let text = "Отчет \(department): \(group) за \(date.stringYYYYMMdd)\n\n" + items.joined(separator: "\n")
 
         do {
-            try self.env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: text))
+             _ = try self.send(chatID: chatID, text: text)
         } catch {
-            print(error.localizedDescription)
+            Log.error("\(error)")
         }
     }
 
@@ -135,54 +193,11 @@ extension HoursController: HoursControllerView {
     }
 }
 
-// MARK: - API
-
-private extension HoursController {
-
-    func timeEntries(users: [FullUser], date: String) -> Future<[(FullUser, [TimeEntries])]> {
-        let promise = env.worker.eventLoop.newPromise([(FullUser, [TimeEntries])].self)
-
-        env.worker.eventLoop.execute { [weak self] in
-            self?._timeEntries(users: users, date: date, buffer: [], promise: promise)
-        }
-
-        return promise.futureResult
-    }
-
-    func _timeEntries(users: [FullUser], date: String, buffer: [(FullUser, [TimeEntries])], promise: Promise<[(FullUser, [TimeEntries])]>) {
-        guard buffer.count < users.count else {
-            promise.succeed(result: buffer)
-            return
-        }
-
-        let user = users[buffer.count]
-
-        let requestPromise = paginationManager.all(requestFactory: { (offset, limit) -> ApiTarget in
-            return RedmineRequest.timeEntries(userID: user.id, date: date, offset: offset, limit: limit)
-        })
-
-        requestPromise.whenSuccess { [weak self] (timeEntries) in
-            let result = buffer + [(user, timeEntries)]
-            self?._timeEntries(users: users, date: date, buffer: result, promise: promise)
-        }
-
-        requestPromise.whenFailure { (error) in
-            promise.fail(error: error)
-        }
-    }
-}
-
 // MARK: - Data
 
 private extension HoursController {
 
-    func users(userField: FullUserField) -> [FullUser] {
-        var users = Storage.shared.users.filter({ $0.contains(fields: [userField]) })
-        users.sort(by: { $0.name < $1.name })
-        return users
-    }
-
-    func date(request: HoursPeriodRequest) -> String {
+    func date(request: HoursPeriodRequest) -> Date {
         let date: Date
 
         switch request.period {
@@ -192,6 +207,6 @@ private extension HoursController {
             date = Date().addingTimeInterval(-86_400) // -сутки
         }
 
-        return date.stringYYYYMMdd
+        return date
     }
 }

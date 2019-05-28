@@ -1,23 +1,15 @@
 import Vapor
 import FluentPostgreSQL
+import FluentMySQL
 
 public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
-
     try services.register(FluentPostgreSQLProvider())
-
-    // Configure a SQLite database
-    let dbArguments = RuntimeArguments.DataBase()
-    let config = PostgreSQLDatabaseConfig(hostname: dbArguments.hostname,
-                                          port: dbArguments.port,
-                                          username: dbArguments.username,
-                                          database: dbArguments.database,
-                                          password: nil,
-                                          transport: .cleartext)
-    let postgres = PostgreSQLDatabase(config: config)
+    try services.register(FluentMySQLProvider())
 
     // Register the configured SQLite database to the database config.
     var databases = DatabasesConfig()
-    databases.add(database: postgres, as: .psql)
+    databases.add(database: postgresDB, as: .psql)
+    databases.add(database: mysqlDB, as: .mysql)
     services.register(databases)
 
     // Configure migrations
@@ -30,3 +22,23 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     services.register(RedmineBot.self)
 }
 
+private var postgresDB: PostgreSQLDatabase {
+    let arguments = RuntimeArguments.PSQLDataBase()
+    let config = PostgreSQLDatabaseConfig(hostname: arguments.hostname,
+                                          port: arguments.port,
+                                          username: arguments.username,
+                                          database: arguments.database,
+                                          password: nil,
+                                          transport: .cleartext)
+    return PostgreSQLDatabase(config: config)
+}
+
+private var mysqlDB: MySQLDatabase {
+    let arguments = RuntimeArguments.MySQLDataBase()
+    let config = MySQLDatabaseConfig(hostname: arguments.hostname,
+                                     port: arguments.port,
+                                     username: arguments.username,
+                                     password: arguments.password,
+                                     database: arguments.database)
+    return MySQLDatabase(config: config)
+}
