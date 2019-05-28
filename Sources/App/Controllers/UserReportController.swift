@@ -201,7 +201,7 @@ private extension UserReportController {
             usersStrings.append(userString)
         }
 
-        let usersSeparator = "***************************"
+        let usersSeparator = "========================="
 
         if usersStrings.count == 1 {
             let userFeedback = usersStrings.first ?? ""
