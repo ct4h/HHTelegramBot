@@ -151,7 +151,10 @@ private extension UserReportController {
     func prepareToDisplay(data: DBHoursResponse, date: String) -> String {
         var usersStrings: [String] = []
 
-        for (user, projects) in data {
+        let sortedUsers = data.keys.sorted(by: { $0.name < $1.name })
+
+        for user in sortedUsers {
+            let projects = data[user] ?? [:]
             let sortedProjects = projects.keys.sorted(by: { $0.name < $1.name })
 
             var projectsStrings: [String] = []
