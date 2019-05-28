@@ -17,24 +17,17 @@ extension Date {
         return DateFormatter.yyyyMMdd.string(from: self)
     }
 
-    var range: (prev: Date, next: Date)? {
+    var zeroTimeDate: Date? {
         guard let calendar = NSCalendar(identifier: .gregorian) else {
             return nil
         }
 
-        var components = calendar.components([.year, .month, .day], from: self)
+        var components = calendar.components([.year, .month, .day, .hour, .minute, .second], from: self)
+        components.hour = 0
+        components.minute = 0
+        components.second = 0
 
-        guard let prevDate = calendar.date(from: components) else {
-            return nil
-        }
-
-        components.day = (components.day ?? 0) + 1
-
-        guard let nextDate = calendar.date(from: components) else {
-            return nil
-        }
-
-        return (prevDate, nextDate)
+        return calendar.date(from: components)
     }
 }
 

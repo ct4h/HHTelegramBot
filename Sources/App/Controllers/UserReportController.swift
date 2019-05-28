@@ -33,25 +33,20 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
             return
         }
 
-        let reportDate = Date()
-
-        guard let rangeDate = reportDate.range else {
+        guard let reportDate = Date().zeroTimeDate else {
             return
         }
-
-        Log.info("Диапозон \(rangeDate)")
 
         env.container.newConnection(to: .mysql).whenSuccess { (connection) in
             _ = self.requestUsers(on: connection, username: username).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
                 let builder = User.query(on: connection)
-                    .filter(\User.status == 1)
+                    .filter(\User.status, .equal, 1)
                     .join(\CustomValue.customized_id, to: \User.id)
                     .join(\CustomField.id, to: \CustomValue.custom_field_id)
                     .filter(\CustomField.name, .equal, "Telegram аккаунт")
                     .filter(\CustomValue.value, .equal, username)
                     .join(\TimeEntries.user_id, to: \User.id)
-                    .filter(\TimeEntries.updated_on >= rangeDate.prev)
-                    .filter(\TimeEntries.updated_on <= rangeDate.next)
+                    .filter(\TimeEntries.spent_on, .equal, reportDate)
                     .join(\Issue.id, to: \TimeEntries.issue_id)
                     .join(\Project.id, to: \TimeEntries.project_id)
                     .alsoDecode(TimeEntries.self)

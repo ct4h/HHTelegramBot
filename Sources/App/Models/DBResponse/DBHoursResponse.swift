@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import LoggerAPI
 
 typealias DBHoursResponse = [User: [Project: [Issue: [TimeEntries]]]]
 

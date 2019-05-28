@@ -83,25 +83,20 @@ extension HoursController: HoursControllerProvider {
     }
 
     private func handle(chatID: Int64, request: HoursPeriodRequest, view: HoursControllerView) {
-        let reportDate = date(request: request)
-
-        guard let rangeDate = reportDate.range else {
+        guard let reportDate = date(request: request).zeroTimeDate else {
             return
         }
-
-        Log.info("Диапозон \(rangeDate)")
 
         env.container.newConnection(to: .mysql).whenSuccess { (connection) in
             _ = self.requestUsers(on: connection, payload: request).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
                 let builder = User.query(on: connection)
-                    .filter(\User.status == 1)
+                    .filter(\User.status, .equal, 1)
                     .join(\CustomValue.customized_id, to: \User.id)
                     .join(\CustomField.id, to: \CustomValue.custom_field_id)
                     .filter(\CustomField.name, .equal, request.groupRequest.departmentRequest.department)
                     .filter(\CustomValue.value, .equal, request.groupRequest.group)
                     .join(\TimeEntries.user_id, to: \User.id)
-                    .filter(\TimeEntries.updated_on >= rangeDate.prev)
-                    .filter(\TimeEntries.updated_on <= rangeDate.next)
+                    .filter(\TimeEntries.spent_on, .equal, reportDate)
                     .join(\Issue.id, to: \TimeEntries.issue_id)
                     .join(\Project.id, to: \TimeEntries.project_id)
                     .alsoDecode(TimeEntries.self)
@@ -159,11 +154,15 @@ extension HoursController: HoursControllerView {
         var usersInfo: [User: [TimeEntries]] = [:]
 
         for (user, projects) in response {
-            usersInfo[user] = []
+            var timeEntries = usersInfo[user] ?? []
 
             for (_, issues) in projects {
-                usersInfo[user] = Array(issues.values).reduce([], +)
+                for value in issues.values {
+                    timeEntries += value
+                }
             }
+
+            usersInfo[user] = timeEntries
         }
 
         var users = Array(usersInfo.keys)
