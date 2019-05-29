@@ -170,8 +170,8 @@ extension HoursController: HoursControllerView {
 
         let items = users.map { (user) -> String in
             let timeEntries = usersInfo[user] ?? []
-            let time = Double(timeEntries.reduce(0, { $0 + $1.hours}))
-            return "\(time.hoursIcon) \(user.name): \(time.format())"
+            let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
+            return "\(time.hoursIcon) \(user.name): \(time.hoursString)"
         }
 
         let department = request.groupRequest.departmentRequest.department

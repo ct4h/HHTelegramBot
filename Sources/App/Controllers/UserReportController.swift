@@ -189,14 +189,14 @@ private extension UserReportController {
                         issuesTime += timeEntriesTime
                     }
 
-                    let projectString = "*\(project.name) \(issuesTime)h:*\n\(issuesStrings.joined(separator: "\n"))"
+                    let projectString = "*\(project.name) \(issuesTime.hoursString)h:*\n\(issuesStrings.joined(separator: "\n"))"
                     projectsStrings.append(projectString)
 
                     projectsTime += issuesTime
                 }
             }
 
-            let userString = "*[\(date)] \(user.lastname) \(user.firstname): \(projectsTime)*"
+            let userString = "*[\(date)] \(user.lastname) \(user.firstname): \(projectsTime.hoursString)*"
             let projectsString = projectsStrings.joined(separator: "\n\n")
 
             if projectsString.isEmpty {
