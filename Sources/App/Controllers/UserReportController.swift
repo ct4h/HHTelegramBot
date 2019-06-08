@@ -37,7 +37,7 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
             return
         }
 
-        env.container.newConnection(to: .mysql).whenSuccess { (connection) in
+        env.container.requestCachedConnection(to: .mysql).whenSuccess { (connection) in
             _ = self.requestUsers(on: connection, username: username).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
                 let builder = User.query(on: connection)
                     .filter(\User.status, .equal, 1)
@@ -56,10 +56,7 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
                 let promise = builder.all()
 
                 promise.throwingSuccess { (result) in
-                    connection.close()
-
                     let response = result.hoursResponse
-
                     var result: DBHoursResponse = [:]
 
                     for user in users {
@@ -72,8 +69,6 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
                 }   
 
                 promise.whenFailure { (error) in
-                    connection.close()
-
                     let errorText = "Не удалось выполнить запрос к базе"
                     self.sendIn(chatID: message.chat.id, text: errorText, error: error)
                 }

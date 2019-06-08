@@ -41,7 +41,7 @@ class HoursDepartmentsRequestFactory: InlineCommandsRequestFactory {
 private extension HoursDepartmentsRequestFactory {
 
     var customFields: Future<[String]> {
-        return container.newConnection(to: .mysql)
+        return container.requestCachedConnection(to: .mysql)
             .flatMap { (connection) -> EventLoopFuture<[CustomField]> in
                 let builder = CustomField.query(on: connection)
                     .filter(\CustomField.type == "UserCustomField")

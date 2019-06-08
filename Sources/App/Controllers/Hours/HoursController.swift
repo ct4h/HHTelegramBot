@@ -87,7 +87,7 @@ extension HoursController: HoursControllerProvider {
             return
         }
 
-        env.container.newConnection(to: .mysql).whenSuccess { (connection) in
+        env.container.requestCachedConnection(to: .mysql).whenSuccess { (connection) in
             _ = self.requestUsers(on: connection, payload: request).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
                 let builder = User.query(on: connection)
                     .filter(\User.status, .equal, 1)
@@ -106,10 +106,7 @@ extension HoursController: HoursControllerProvider {
                 let promise = builder.all()
 
                 promise.throwingSuccess { (result) in
-                    connection.close()
-
                     let response = result.hoursResponse
-
                     var result: DBHoursResponse = [:]
 
                     for user in users {
@@ -120,8 +117,6 @@ extension HoursController: HoursControllerProvider {
                 }
 
                 promise.whenFailure { (error) in
-                    connection.close()
-
                     view.sendHours(chatID: chatID, error: error)
                 }
 

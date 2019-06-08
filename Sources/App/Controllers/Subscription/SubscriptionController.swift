@@ -91,7 +91,7 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
 
         let utcTime = time - 3
 
-        env.container.newConnection(to: .psql).whenSuccess { (connection) in
+        env.container.requestCachedConnection(to: .psql).whenSuccess { (connection) in
             let subscription = Subscription(chatID: chatID,
                                             query: query,
                                             period: SubscriptionPeriod.daily.rawValue,
@@ -99,15 +99,11 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
             let promise = subscription.save(on: connection)
 
             promise.throwingSuccess({ [weak self] subscription in
-                connection.close()
-
                 let completeText = "Команда: \(query) успешно сохранена"
                 try self?.env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: completeText))
             })
 
             promise.throwingFailure({ [weak self] (error) in
-                connection.close()
-
                 let errorText = "Не удалось сохранить команду \(query)\nError: \(error)"
                 try self?.env.bot.sendMessage(params: Bot.SendMessageParams(chatId: .chat(chatID), text: errorText))
             })
@@ -153,21 +149,17 @@ private extension SubscriptionController {
             return
         }
 
-        env.container.newConnection(to: .psql).whenSuccess { (connection) in
+        env.container.requestCachedConnection(to: .psql).whenSuccess { (connection) in
             let promise = Subscription
                 .query(on: connection)
                 .filter(\.chatID, .equal, chatID)
                 .delete()
 
             promise.throwingSuccess { [weak self] in
-                connection.close()
-
                 _ = try self?.send(chatID: chatID, text: "Подписки удалены")
             }
 
             promise.throwingFailure({ [weak self] (error) in
-                connection.close()
-
                 _ = try self?.send(chatID: chatID, text: "Не удалось удалить подписки")
             })
         }
@@ -179,7 +171,7 @@ private extension SubscriptionController {
 private extension SubscriptionController {
 
     func executeSubscriptions(chatID: Int64?, time: Int8?) {
-        env.container.newConnection(to: .psql).whenSuccess { (connection) in
+        env.container.requestCachedConnection(to: .psql).whenSuccess { (connection) in
             var builder: QueryBuilder<PostgreSQLDatabase, Subscription>
             builder = Subscription.query(on: connection)
 
@@ -194,14 +186,10 @@ private extension SubscriptionController {
             let promise = builder.all()
 
             promise.throwingSuccess { [weak self] (subscriptions) in
-                connection.close()
-
                 try self?.execute(subscriptions: subscriptions)
             }
 
             promise.whenFailure { [weak self] (error) in
-                connection.close()
-
                 if let chatID = chatID {
                     let errorText = "Не удалось выполнить запрос к базе"
                     self?.sendIn(chatID: chatID, text: errorText, error: error)

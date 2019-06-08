@@ -41,7 +41,7 @@ class HoursGroupsRequestFactory: InlineCommandsRequestFactory {
 private extension HoursGroupsRequestFactory {
 
     func groups(customFieldName: String) -> Future<[String]> {
-        return container.newConnection(to: .mysql)
+        return container.requestCachedConnection(to: .mysql)
             .flatMap { (connection) -> EventLoopFuture<[CustomField]> in
                 let builder = CustomField.query(on: connection)
                     .filter(\.name == customFieldName)
