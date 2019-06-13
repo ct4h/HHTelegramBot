@@ -128,7 +128,9 @@ extension HoursController: HoursControllerProvider {
     }
 
     private func requestTimeEntries(request: HoursPeriodRequest, reportDate: Date) -> Future<DBHoursResponse> {
-        Log.info("[2] report date \(reportDate)")
+        let fieldName = request.groupRequest.departmentRequest.department
+        let fieldValue = request.groupRequest.group
+        Log.info("[2] report date \(reportDate) CustomField.name \(fieldName) CustomValue.value \(fieldValue)")
 
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection,DBHoursResponse)>? in
@@ -136,8 +138,8 @@ extension HoursController: HoursControllerProvider {
                     .filter(\User.status, .equal, 1)
                     .join(\CustomValue.customized_id, to: \User.id)
                     .join(\CustomField.id, to: \CustomValue.custom_field_id)
-                    .filter(\CustomField.name, .equal, request.groupRequest.departmentRequest.department)
-                    .filter(\CustomValue.value, .equal, request.groupRequest.group)
+                    .filter(\CustomField.name, .equal, fieldName)
+                    .filter(\CustomValue.value, .equal, fieldValue)
                     .join(\TimeEntries.user_id, to: \User.id)
                     .filter(\TimeEntries.spent_on, .equal, reportDate)
                     .join(\Issue.id, to: \TimeEntries.issue_id)

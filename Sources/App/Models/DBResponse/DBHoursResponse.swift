@@ -15,6 +15,8 @@ extension Array where Element == (((User, TimeEntries), Issue), Project) {
     var hoursResponse: DBHoursResponse {
         var mappedData: [User: [Project: [Issue: [TimeEntries]]]] = [:]
 
+        Log.info("Count items \(count)")
+
         for (((user, timeEntry), issue), project) in self {
             var userProjects: [Project: [Issue: [TimeEntries]]] = [:]
 
