@@ -87,6 +87,8 @@ extension HoursController: HoursControllerProvider {
             return
         }
 
+        Log.info("[1] report date \(reportDate)")
+
         requestUsers(payload: request)
             .then { (users) -> EventLoopFuture<([User], DBHoursResponse)> in
                 return self.requestTimeEntries(request: request, reportDate: reportDate)
@@ -125,7 +127,9 @@ extension HoursController: HoursControllerProvider {
             })
     }
 
-    private func requestTimeEntries(request: HoursPeriodRequest,  reportDate: Date) -> Future<DBHoursResponse> {
+    private func requestTimeEntries(request: HoursPeriodRequest, reportDate: Date) -> Future<DBHoursResponse> {
+        Log.info("[2] report date \(reportDate)")
+
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection,DBHoursResponse)>? in
                 let builder = User.query(on: connection)

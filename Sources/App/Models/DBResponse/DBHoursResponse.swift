@@ -34,6 +34,8 @@ extension Array where Element == (((User, TimeEntries), Issue), Project) {
                 issueTimeEntries = buffer
             }
 
+            Log.info("[\(user.name)] \(timeEntry.hours)")
+
             issueTimeEntries.append(timeEntry)
             projectIssues[issue] = issueTimeEntries
             userProjects[project] = projectIssues
