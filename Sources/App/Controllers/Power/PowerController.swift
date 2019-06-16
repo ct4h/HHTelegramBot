@@ -32,6 +32,8 @@ class PowerController: ParentController, CommandsHandler {
             return
         }
 
+        Log.info("Start request power")
+
         requestUser()
             .thenFuture { (user) -> EventLoopFuture<(User, Project)>? in
                 return self.requestProject()
@@ -117,6 +119,7 @@ class PowerController: ParentController, CommandsHandler {
     }
 
     private func requestIssueRelationships(projectId: Int, userId: Int) -> Future<[IssueRelationship]> {
+        Log.info("Request relationships")
 
         return requestAllIssues(projectId: projectId)
             .thenFuture { (issues) -> EventLoopFuture<[IssueWithTimeEntries]>? in
@@ -135,6 +138,8 @@ class PowerController: ParentController, CommandsHandler {
                             issuesMap[timeEntiry.issue_id]?.timeEntries.append(timeEntiry)
                         }
 
+                        Log.info("Add timeEntries to relationships")
+
                         return Array(issuesMap.values)
                     }
             }
@@ -152,6 +157,8 @@ class PowerController: ParentController, CommandsHandler {
                         for issue in issues {
                             issuesMap[issue.issue.root_id]?.childs.append(issue)
                         }
+
+                        Log.info("Add childs to issues")
 
                         return Array(issuesMap.values)
                     }
@@ -175,6 +182,8 @@ class PowerController: ParentController, CommandsHandler {
                 return builder
                     .all()
                     .map({ (response) -> ([IssueRelationship]) in
+                        Log.info("Map issues to IssueRelationship")
+
                         return response.map({ (item) -> IssueRelationship in
                             let (issue, customValue) = item
                             let time = customValue.value.timeInterval
@@ -199,13 +208,15 @@ class PowerController: ParentController, CommandsHandler {
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection, [Issue])>? in
                 let builder = Issue.query(on: connection)
-                    .filter(\TimeEntries.project_id, .equal, projectId)
+                    .filter(\Issue.project_id, .equal, projectId)
 
                 return builder
                     .all()
                     .map { (connection, $0) }
             }
             .map({ (result) -> [Issue] in
+                Log.info("Complete extract \(result.1.count) issues")
+
                 result.0.close()
                 return result.1
             })
@@ -227,6 +238,8 @@ class PowerController: ParentController, CommandsHandler {
                     .map { (connection, $0) }
             }
             .map({ (result) -> [TimeEntries] in
+                Log.info("Complete extract \(result.1.count) time entries")
+
                 result.0.close()
                 return result.1
             })
