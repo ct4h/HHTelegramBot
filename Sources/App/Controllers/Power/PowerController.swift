@@ -174,7 +174,7 @@ class PowerController: ParentController, CommandsHandler {
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection, [IssueRelationship])>? in
                 let builder = Issue.query(on: connection)
-                    .filter(\TimeEntries.project_id, .equal, projectId)
+                    .filter(\Issue.project_id, .equal, projectId)
                     .join(\CustomValue.customized_id, to: \Issue.id)
                     .filter(\CustomValue.custom_field_id, .equal, 14)
                     .alsoDecode(CustomValue.self)
