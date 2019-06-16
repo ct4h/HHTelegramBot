@@ -52,21 +52,33 @@ class PowerController: ParentController, CommandsHandler {
             .whenSuccess { (data) in
                 let (user, project, issues) = data
 
-                let issuesStrings = issues.compactMap { (issue) -> String? in
+                let sortedIssues = issues.sorted(by: { (lhs, rhs) -> Bool in
+                    return (lhs.id ?? 0) < (rhs.id ?? 0)
+                })
+
+                let issuesStrings = sortedIssues.compactMap { (issue) -> String? in
                     let trackedTime = issue.trackedHours
 
                     if trackedTime == 0 {
                         return nil
                     }
 
-                    let id = issue.id ?? 0
-                    let subject = issue.rootIssue.issue.subject
-                    let time = Float(issue.time).hoursString
+                    let issueId = issue.id ?? 0
+                    let issueText = "[PM-\(issueId)](https://pm.handh.ru/issues/\(issueId))"
 
-                    return "[\(id)] \(subject) {\(issue.childs.count)} \(trackedTime.hoursString)h from \(time)h"
+                    var subject = issue.rootIssue.issue.subject
+
+                    let subjectMaxLenght = 15
+                    if subject.count > subjectMaxLenght {
+                        subject = subject.prefix(subjectMaxLenght) + "..."
+                    }
+
+                    let totalTime = Float(issue.time).hoursString
+
+                    return " • \(issueText) \(subject):\n\(trackedTime.hoursString) из \(totalTime)"
                 }
 
-                let text = "\(user.name) \(project.name)\n" + issuesStrings.joined(separator: "\n")
+                let text = "**\(user.name) \(project.name)**\n\n" + issuesStrings.joined(separator: "\n")
 
                 do {
                     _ = try self.send(chatID: chatID, text: text)
