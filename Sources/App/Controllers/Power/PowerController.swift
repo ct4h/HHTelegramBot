@@ -32,7 +32,7 @@ class PowerController: ParentController, CommandsHandler {
             return
         }
 
-        let parameters = message.text?.urlParameters
+        let parameters = message.text?.replacingOccurrences(of: "/power ", with: "power?").urlParameters
         Log.info("Original text \(String(describing: message.text)) >> parameters \(String(describing: parameters))")
 
         guard let userId = Int(parameters?["user"] ?? ""), let projectName = parameters?["project"] else {
