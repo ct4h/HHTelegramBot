@@ -37,8 +37,54 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
             return
         }
 
-        env.container.requestCachedConnection(to: .mysql).whenSuccess { (connection) in
-            _ = self.requestUsers(on: connection, username: username).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
+        requestUsers(username: username)
+            .then { (users) -> EventLoopFuture<([User], DBHoursResponse)> in
+                return self.requestTimeEntries(username: username, reportDate: reportDate)
+                    .map { (users, $0) }
+            }
+            .whenSuccess { (response) in
+                let users = response.0
+                let hours = response.1
+
+                var result: DBHoursResponse = [:]
+
+                for user in users {
+                    result[user] = hours[user] ?? [:]
+                }
+
+                let text = self.prepareToDisplay(data: result, date: reportDate.stringYYYYMMdd)
+                Log.info("Convert to text \(text)")
+
+                do {
+                     _ = try self.send(chatID: message.chat.id, text: text)
+                } catch {
+                    Log.error("Error send message \(error)")
+                }
+            }
+    }
+
+    private func requestUsers(username: String) -> Future<[User]> {
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection,[User])>? in
+                let builder = User.query(on: connection)
+                    .filter(\User.status == 1)
+                    .join(\CustomValue.customized_id, to: \User.id)
+                    .join(\CustomField.id, to: \CustomValue.custom_field_id)
+                    .filter(\CustomField.name, .equal, "Telegram аккаунт")
+                    .filter(\CustomValue.value, .equal, username)
+                return builder
+                    .all()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [User] in
+                result.0.close()
+                return result.1
+            })
+    }
+
+    private func requestTimeEntries(username: String, reportDate: Date) -> Future<DBHoursResponse> {
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection,DBHoursResponse)>? in
                 let builder = User.query(on: connection)
                     .filter(\User.status, .equal, 1)
                     .join(\CustomValue.customized_id, to: \User.id)
@@ -52,41 +98,14 @@ class UserReportController: ParentController, CommandsHandler, InlineCommandsHan
                     .alsoDecode(TimeEntries.self)
                     .alsoDecode(Issue.self)
                     .alsoDecode(Project.self)
-
-                let promise = builder.all()
-
-                promise.throwingSuccess { (result) in
-                    let response = result.hoursResponse
-                    var result: DBHoursResponse = [:]
-
-                    for user in users {
-                        result[user] = response[user] ?? [:]
-                    }
-
-                    let text = self.prepareToDisplay(data: result, date: reportDate.stringYYYYMMdd)
-                    Log.info("Convert to text \(text)")
-                    _ = try self.send(chatID: message.chat.id, text: text)
-                }   
-
-                promise.whenFailure { (error) in
-                    let errorText = "Не удалось выполнить запрос к базе"
-                    self.sendIn(chatID: message.chat.id, text: errorText, error: error)
-                }
-
-                return promise
+                return builder
+                    .all()
+                    .map { (connection, $0.hoursResponse) }
             }
-        }
-    }
-
-    private func requestUsers(on connection: MySQLConnection, username: String) -> Future<[User]> {
-        let builder = User.query(on: connection)
-            .filter(\User.status == 1)
-            .join(\CustomValue.customized_id, to: \User.id)
-            .join(\CustomField.id, to: \CustomValue.custom_field_id)
-            .filter(\CustomField.name, .equal, "Telegram аккаунт")
-            .filter(\CustomValue.value, .equal, username)
-
-        return builder.all()
+            .map({ (result) -> DBHoursResponse in
+                result.0.close()
+                return result.1
+            })
     }
 
     // MARK: - InlineCommandsHandler

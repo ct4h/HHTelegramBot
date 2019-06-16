@@ -87,14 +87,59 @@ extension HoursController: HoursControllerProvider {
             return
         }
 
-        env.container.requestCachedConnection(to: .mysql).whenSuccess { (connection) in
-            _ = self.requestUsers(on: connection, payload: request).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
+        Log.info("[1] report date \(reportDate)")
+
+        requestUsers(payload: request)
+            .then { (users) -> EventLoopFuture<([User], DBHoursResponse)> in
+                return self.requestTimeEntries(request: request, reportDate: reportDate)
+                    .map { (users, $0) }
+            }
+            .whenSuccess { (response) in
+                let users = response.0
+                let hours = response.1
+
+                var result: DBHoursResponse = [:]
+
+                for user in users {
+                    result[user] = hours[user] ?? [:]
+                }
+
+                view.sendHours(chatID: chatID, request: request, date: reportDate, response: result)
+            }
+    }
+
+    private func requestUsers(payload: HoursPeriodRequest) -> Future<[User]> {
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection,[User])>? in
+                let builder = User.query(on: connection)
+                    .filter(\User.status == 1)
+                    .join(\CustomValue.customized_id, to: \User.id)
+                    .join(\CustomField.id, to: \CustomValue.custom_field_id)
+                    .filter(\CustomField.name, .equal, payload.groupRequest.departmentRequest.department)
+                    .filter(\CustomValue.value, .equal, payload.groupRequest.group)
+                return builder
+                    .all()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [User] in
+                result.0.close()
+                return result.1
+            })
+    }
+
+    private func requestTimeEntries(request: HoursPeriodRequest, reportDate: Date) -> Future<DBHoursResponse> {
+        let fieldName = request.groupRequest.departmentRequest.department
+        let fieldValue = request.groupRequest.group
+        Log.info("[2] report date \(reportDate) CustomField.name \(fieldName) CustomValue.value \(fieldValue)")
+
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection,DBHoursResponse)>? in
                 let builder = User.query(on: connection)
                     .filter(\User.status, .equal, 1)
                     .join(\CustomValue.customized_id, to: \User.id)
                     .join(\CustomField.id, to: \CustomValue.custom_field_id)
-                    .filter(\CustomField.name, .equal, request.groupRequest.departmentRequest.department)
-                    .filter(\CustomValue.value, .equal, request.groupRequest.group)
+                    .filter(\CustomField.name, .equal, fieldName)
+                    .filter(\CustomValue.value, .equal, fieldValue)
                     .join(\TimeEntries.user_id, to: \User.id)
                     .filter(\TimeEntries.spent_on, .equal, reportDate)
                     .join(\Issue.id, to: \TimeEntries.issue_id)
@@ -102,39 +147,16 @@ extension HoursController: HoursControllerProvider {
                     .alsoDecode(TimeEntries.self)
                     .alsoDecode(Issue.self)
                     .alsoDecode(Project.self)
-
-                let promise = builder.all()
-
-                promise.throwingSuccess { (result) in
-                    let response = result.hoursResponse
-                    var result: DBHoursResponse = [:]
-
-                    for user in users {
-                        result[user] = response[user] ?? [:]
-                    }
-
-                    view.sendHours(chatID: chatID, request: request, date: reportDate, response: result)
-                }
-
-                promise.whenFailure { (error) in
-                    view.sendHours(chatID: chatID, error: error)
-                }
-
-                return promise
+                return builder
+                    .all()
+                    .map { (connection, $0.hoursResponse) }
             }
-        }
+            .map({ (result) -> DBHoursResponse in
+                result.0.close()
+                return result.1
+            })
     }
 
-    private func requestUsers(on connection: MySQLConnection, payload: HoursPeriodRequest) -> Future<[User]> {
-        let builder = User.query(on: connection)
-            .filter(\User.status == 1)
-            .join(\CustomValue.customized_id, to: \User.id)
-            .join(\CustomField.id, to: \CustomValue.custom_field_id)
-            .filter(\CustomField.name, .equal, payload.groupRequest.departmentRequest.department)
-            .filter(\CustomValue.value, .equal, payload.groupRequest.group)
-
-        return builder.all()
-    }
 }
 
 // MARK: - View
