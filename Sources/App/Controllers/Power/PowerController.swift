@@ -77,7 +77,7 @@ class PowerController: ParentController, CommandsHandler {
 
                     var subject = issue.rootIssue.issue.subject
 
-                    let subjectMaxLenght = 15
+                    let subjectMaxLenght = 25
                     if subject.count > subjectMaxLenght {
                         subject = subject.prefix(subjectMaxLenght) + "..."
                     }
@@ -104,7 +104,7 @@ class PowerController: ParentController, CommandsHandler {
                 }
 
                 let avgPower = powers.reduce(0, +) / Float(powers.count)
-                let text = "*\(user.name) \(project.name) \(avgPower)*\n\n" + issuesStrings.joined(separator: "\n")
+                let text = "*\(user.name) \(project.name) \(avgPower)*\n\n" + issuesStrings.joined(separator: "\n\n")
 
                 do {
                     _ = try self.send(chatID: message.chat.id, text: text)
