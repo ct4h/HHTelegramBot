@@ -63,8 +63,10 @@ class PowerController: ParentController, CommandsHandler {
                     return (lhs.id ?? 0) < (rhs.id ?? 0)
                 })
 
+                var powers: [Float] = []
+
                 let issuesStrings = sortedIssues.compactMap { (issue) -> String? in
-                    let trackedTime = issue.trackedHours
+                    let trackedTime = issue.userTrackedHours
 
                     if trackedTime == 0 {
                         return nil
@@ -80,12 +82,29 @@ class PowerController: ParentController, CommandsHandler {
                         subject = subject.prefix(subjectMaxLenght) + "..."
                     }
 
-                    let totalTime = Float(issue.time).hoursString
+                    let futureTime = Float(issue.time)
+                    let totalTime = issue.allTrackerHours
 
-                    return " • \(issueText) \(subject):\n\(trackedTime.hoursString) из \(totalTime)"
+                    let power = ((totalTime - futureTime) * trackedTime / (totalTime * futureTime)) + 1
+
+                    powers.append(power)
+
+                    let futureTimeString = "Оценка: \(futureTime.hoursString)h"
+                    let totalTimeString = "Всего: \(totalTime.hoursString)h"
+                    let userTimeString = "Затрекал: \(trackedTime.hoursString)h"
+                    let powerString = "Мощность: \(power)"
+
+                    return [
+                        " • \(issueText) \(subject):",
+                        futureTimeString,
+                        totalTimeString,
+                        userTimeString,
+                        powerString
+                    ].joined(separator: "\n")
                 }
 
-                let text = "**\(user.name) \(project.name)**\n\n" + issuesStrings.joined(separator: "\n")
+                let avgPower = powers.reduce(0, +) / Float(powers.count)
+                let text = "*\(user.name) \(project.name) \(avgPower)*\n\n" + issuesStrings.joined(separator: "\n")
 
                 do {
                     _ = try self.send(chatID: message.chat.id, text: text)
@@ -156,17 +175,38 @@ class PowerController: ParentController, CommandsHandler {
                     }
                 }
 
-                return self.requestTimeEntries(userId: userId, projectId: projectId)
+                return self.requestUserTimeEntries(userId: userId, projectId: projectId)
                     .map { (timeEntries) -> ([IssueWithTimeEntries]) in
 
                         for timeEntiry in timeEntries {
-                            issuesMap[timeEntiry.issue_id]?.timeEntries.append(timeEntiry)
+                            issuesMap[timeEntiry.issue_id]?.userTimeEntries.append(timeEntiry)
                         }
 
-                        Log.info("Add timeEntries to relationships")
+                        Log.info("Add user timeEntries to relationships")
 
                         return Array(issuesMap.values)
                     }
+            }
+            .thenFuture { (issues) -> EventLoopFuture<[IssueWithTimeEntries]>? in
+                var issuesMap: [Int: IssueWithTimeEntries] = [:]
+
+                for issue in issues {
+                    if let id = issue.issue.id {
+                        issuesMap[id] = issue
+                    }
+                }
+
+                return self.requestAllTimeEntries(projectId: projectId)
+                    .map { (timeEntries) -> ([IssueWithTimeEntries]) in
+
+                        for timeEntiry in timeEntries {
+                            issuesMap[timeEntiry.issue_id]?.allTimeEntries.append(timeEntiry)
+                        }
+
+                        Log.info("Add all timeEntries to relationships")
+
+                        return Array(issuesMap.values)
+                }
             }
             .thenFuture { (issues) -> EventLoopFuture<[IssueRelationship]>? in
                 return self.requestRootIssues(projectId: projectId)
@@ -255,8 +295,8 @@ class PowerController: ParentController, CommandsHandler {
     /**
      Запрашиваем все затреканные часы по пользователю внутри проекта
      */
-    private func requestTimeEntries(userId: Int, projectId: Int) -> Future<[TimeEntries]> {
-        Log.info("Request time entries")
+    private func requestUserTimeEntries(userId: Int, projectId: Int) -> Future<[TimeEntries]> {
+        Log.info("Request user time entries")
 
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection, [TimeEntries])>? in
@@ -275,6 +315,29 @@ class PowerController: ParentController, CommandsHandler {
             })
     }
 
+    /**
+     Запрашиваем все затреканные часы внутри проекта
+     */
+    private func requestAllTimeEntries(projectId: Int) -> Future<[TimeEntries]> {
+        Log.info("Request all time entries")
+
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, [TimeEntries])>? in
+                let builder = TimeEntries.query(on: connection)
+                    .filter(\TimeEntries.project_id, .equal, projectId)
+                return builder
+                    .all()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [TimeEntries] in
+                Log.info("Complete extract \(result.1.count) time entries")
+
+                result.0.close()
+                return result.1
+            })
+    }
+
+
     private class IssueRelationship {
         let rootIssue: IssueWithTimeEntries
         let time: Double
@@ -285,8 +348,12 @@ class PowerController: ParentController, CommandsHandler {
             return rootIssue.issue.id
         }
 
-        var trackedHours: Float {
-            return childs.reduce(0, { $0 + $1.trackedHours })
+        var userTrackedHours: Float {
+            return childs.reduce(0, { $0 + $1.userTrackedHours })
+        }
+
+        var allTrackerHours: Float {
+            return childs.reduce(0, { $0 + $1.allTrackerHours })
         }
 
         init(rootIssue: IssueWithTimeEntries, time: Double) {
@@ -297,10 +364,15 @@ class PowerController: ParentController, CommandsHandler {
 
     private class IssueWithTimeEntries {
         let issue: Issue
-        var timeEntries: [TimeEntries] = []
+        var userTimeEntries: [TimeEntries] = []
+        var allTimeEntries: [TimeEntries] = []
 
-        var trackedHours: Float {
-            return timeEntries.reduce(0, { $0 + $1.hours })
+        var userTrackedHours: Float {
+            return userTimeEntries.reduce(0, { $0 + $1.hours })
+        }
+
+        var allTrackerHours: Float {
+            return allTimeEntries.reduce(0, { $0 + $1.hours })
         }
 
         init(issue: Issue) {
