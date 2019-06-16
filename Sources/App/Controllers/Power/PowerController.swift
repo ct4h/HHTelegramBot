@@ -52,12 +52,18 @@ class PowerController: ParentController, CommandsHandler {
             .whenSuccess { (data) in
                 let (user, project, issues) = data
 
-                let issuesStrings = issues.map { (issue) -> String in
+                let issuesStrings = issues.compactMap { (issue) -> String? in
+                    let trackedTime = issue.trackedHours
+
+                    if trackedTime == 0 {
+                        return nil
+                    }
+
                     let id = issue.id ?? 0
                     let subject = issue.rootIssue.issue.subject
                     let time = Float(issue.time).hoursString
-                    let trackedTime = issue.trackedHours.hoursString
-                    return "[\(id)] \(subject) {\(issue.childs.count)} \(trackedTime)h from \(time)h"
+
+                    return "[\(id)] \(subject) {\(issue.childs.count)} \(trackedTime.hoursString)h from \(time)h"
                 }
 
                 let text = "\(user.name) \(project.name)\n" + issuesStrings.joined(separator: "\n")
@@ -184,12 +190,19 @@ class PowerController: ParentController, CommandsHandler {
                     .map({ (response) -> ([IssueRelationship]) in
                         Log.info("Map issues to IssueRelationship")
 
-                        return response.map({ (item) -> IssueRelationship in
+                        return response.compactMap { (item) -> IssueRelationship? in
                             let (issue, customValue) = item
+
+                            if issue.id != issue.root_id {
+                                return nil
+                            }
+
                             let time = customValue.value.timeInterval
+                            Log.info("Convert \(customValue.value) >> \(time)")
+
                             let rootIssue = IssueWithTimeEntries(issue: issue)
                             return IssueRelationship(rootIssue: rootIssue, time: time)
-                        })
+                        }
                     })
                     .map { (connection, $0) }
             }
