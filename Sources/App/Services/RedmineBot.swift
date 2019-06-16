@@ -11,6 +11,7 @@ final class RedmineBot: ServiceType {
     private let hoursControllers: HoursController
     private let userReportControllers: UserReportController
     private let subscriptionController: SubscriptionController
+    private let powerController: PowerController
 
     var updater: Updater?
     private var dispatcher: Dispatcher?
@@ -36,6 +37,8 @@ final class RedmineBot: ServiceType {
         subscriptionController.add(child: hoursControllers)
         subscriptionController.add(child: userReportControllers)
 
+        powerController = PowerController(env: controllerEnv)
+
         let dispatcher = try configureDispatcher()
         self.dispatcher = dispatcher
         self.updater = Updater(bot: bot, dispatcher: dispatcher)
@@ -60,7 +63,7 @@ final class RedmineBot: ServiceType {
     // MARK: - Helpers
 
     private var commandHandlers: [CommandsHandler] {
-        return [hoursControllers, userReportControllers, subscriptionController]
+        return [hoursControllers, userReportControllers, subscriptionController, powerController]
     }
 
     private var inlineCommmandHandlers: [InlineCommandsHandler] {

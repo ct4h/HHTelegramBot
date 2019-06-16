@@ -16,12 +16,22 @@ final class Issue: MySQLModel, Hashable {
     var tracker_id: Int
     var project_id: Int
     var subject: String
+    var root_id: Int
 
-    init(id: Int, tracker_id: Int, customized_id: Int, project_id: Int, subject: String) {
+    init(
+        id: Int,
+        tracker_id: Int,
+        customized_id: Int,
+        project_id: Int,
+        subject: String,
+        root_id: Int
+        ) {
+
         self.id = id
         self.tracker_id = tracker_id
         self.project_id = project_id
         self.subject = subject
+        self.root_id = root_id
     }
 
     func hash(into hasher: inout Hasher) {

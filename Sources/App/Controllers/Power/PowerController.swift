@@ -15,6 +15,11 @@ import MySQL
 
 class PowerController: ParentController, CommandsHandler {
 
+    enum ExeptionError: Error {
+        case userNotFound
+        case projectNotFound
+    }
+
     // MARK: - CommandsHandler
 
     var handlers: [Handler] {
@@ -27,190 +32,237 @@ class PowerController: ParentController, CommandsHandler {
             return
         }
 
-        env.container.requestCachedConnection(to: .mysql).whenSuccess { (connection) in
-            let builder = TimeEntries.query(on: connection)
-
-                .join(\User.id, to: \TimeEntries.user_id)
-                .filter(\User.id, .equal, 285)
-                .join(\Project.id, to: \TimeEntries.project_id)
-                .filter(\Project.name, .equal, "ЯКИТОРИЯ | IOS")
-                .join(\Issue.id, to: \TimeEntries.issue_id)
-//                .group(._add, closure: { (builder) in
-//                    builder.filter(\, <#T##method: MySQLBinaryOperator##MySQLBinaryOperator#>, <#T##value: Encodable##Encodable#>)
-//                    builder.sum(\TimeEntries.hours)
-//                })
-                .groupBy(\TimeEntries.issue_id)
-//            let users = try User.query(on: conn).group(.or) { or in
-//                ///         or.filter(\.age < 18)
-//                ///         or.filter(\.age > 65)
-//                ///     }
-//                .sum(\TimeEntries.hours)
-//                .alsoDecode(Issue.self)
-
-//                .filter(\User.status, .equal, 1)
-//                .join(\CustomValue.customized_id, to: \User.id)
-//                .join(\CustomField.id, to: \CustomValue.custom_field_id)
-//                .filter(\CustomField.name, .equal, request.groupRequest.departmentRequest.department)
-//                .filter(\CustomValue.value, .equal, request.groupRequest.group)
-//                .join(\TimeEntries.user_id, to: \User.id)
-//                .filter(\TimeEntries.spent_on, .equal, reportDate)
-//                .join(\Issue.id, to: \TimeEntries.issue_id)
-//                .join(\Project.id, to: \TimeEntries.project_id)
-//                .alsoDecode(TimeEntries.self)
-//                .alsoDecode(Issue.self)
-//                .alsoDecode(Project.self)
-
-            let promise = builder.all()
-
-            promise.throwingSuccess { (result) in
-//                let response = result.hoursResponse
-//                var result: DBHoursResponse = [:]
-//
-//                for user in users {
-//                    result[user] = response[user] ?? [:]
-//                }
-//
-//                view.sendHours(chatID: chatID, request: request, date: reportDate, response: result)
+        requestUser()
+            .thenFuture { (user) -> EventLoopFuture<(User, Project)>? in
+                return self.requestProject()
+                    .map { (user, $0)}
             }
+            .thenFuture { (data) -> EventLoopFuture<(User, Project, [IssueRelationship])>? in
+                let (user, project) = data
+                let projectId = project.id ?? 0
+                let userId = user.id ?? 0
 
-            promise.whenFailure { (error) in
-//                view.sendHours(chatID: chatID, error: error)
-            }
-        }
-    }
-}
-
-/*
-extension HoursController: HoursControllerProvider {
-
-    func handle(chatID: Int64, query: String, view: HoursControllerView) {
-        guard let request = HoursPeriodRequest(query: query) else {
-            return
-        }
-
-        handle(chatID: chatID, request: request, view: view)
-    }
-
-    private func handle(chatID: Int64, request: HoursPeriodRequest, view: HoursControllerView) {
-        guard let reportDate = date(request: request).zeroTimeDate else {
-            return
-        }
-
-        env.container.requestCachedConnection(to: .mysql).whenSuccess { (connection) in
-            _ = self.requestUsers(on: connection, payload: request).flatMap { (users) -> Future<[(((User, TimeEntries), Issue), Project)]> in
-                let builder = User.query(on: connection)
-                    .filter(\User.status, .equal, 1)
-                    .join(\CustomValue.customized_id, to: \User.id)
-                    .join(\CustomField.id, to: \CustomValue.custom_field_id)
-                    .filter(\CustomField.name, .equal, request.groupRequest.departmentRequest.department)
-                    .filter(\CustomValue.value, .equal, request.groupRequest.group)
-                    .join(\TimeEntries.user_id, to: \User.id)
-                    .filter(\TimeEntries.spent_on, .equal, reportDate)
-                    .join(\Issue.id, to: \TimeEntries.issue_id)
-                    .join(\Project.id, to: \TimeEntries.project_id)
-                    .alsoDecode(TimeEntries.self)
-                    .alsoDecode(Issue.self)
-                    .alsoDecode(Project.self)
-
-                let promise = builder.all()
-
-                promise.throwingSuccess { (result) in
-                    let response = result.hoursResponse
-                    var result: DBHoursResponse = [:]
-
-                    for user in users {
-                        result[user] = response[user] ?? [:]
+                return self.requestIssueRelationships(projectId: projectId, userId: userId)
+                    .map { (issues) -> (User, Project, [IssueRelationship]) in
+                        return (user, project, issues)
                     }
-
-                    view.sendHours(chatID: chatID, request: request, date: reportDate, response: result)
-                }
-
-                promise.whenFailure { (error) in
-                    view.sendHours(chatID: chatID, error: error)
-                }
-
-                return promise
             }
-        }
-    }
+            .whenSuccess { (data) in
+                let (user, project, issues) = data
 
-    private func requestUsers(on connection: MySQLConnection, payload: HoursPeriodRequest) -> Future<[User]> {
-        let builder = User.query(on: connection)
-            .filter(\User.status == 1)
-            .join(\CustomValue.customized_id, to: \User.id)
-            .join(\CustomField.id, to: \CustomValue.custom_field_id)
-            .filter(\CustomField.name, .equal, payload.groupRequest.departmentRequest.department)
-            .filter(\CustomValue.value, .equal, payload.groupRequest.group)
+                let issuesStrings = issues.map { (issue) -> String in
+                    let id = issue.id ?? 0
+                    let subject = issue.rootIssue.issue.subject
+                    let time = Float(issue.time).hoursString
+                    let trackedTime = issue.trackedHours.hoursString
+                    return "[\(id)] \(subject) {\(issue.childs.count)} \(trackedTime)h from \(time)h"
+                }
 
-        return builder.all()
-    }
-}
+                let text = "\(user.name) \(project.name)\n" + issuesStrings.joined(separator: "\n")
 
-// MARK: - View
-
-extension HoursController: HoursControllerView {
-
-    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: Date, response: DBHoursResponse) {
-        guard chatID != 0 else {
-            return
-        }
-
-        var usersInfo: [User: [TimeEntries]] = [:]
-
-        for (user, projects) in response {
-            var timeEntries = usersInfo[user] ?? []
-
-            for (_, issues) in projects {
-                for value in issues.values {
-                    timeEntries += value
+                do {
+                    _ = try self.send(chatID: chatID, text: text)
+                } catch {
+                    Log.error("\(error)")
                 }
             }
+    }
 
-            usersInfo[user] = timeEntries
+    private func requestUser() -> Future<User> {
+        Log.info("Request user")
+
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, User?)>? in
+                let builder = User.query(on: connection)
+                    .filter(\User.id, .equal, 285)
+                return builder
+                    .first()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> User? in
+                result.0.close()
+                return result.1
+            })
+            .map { (user) -> User in
+                guard let user = user else {
+                    throw ExeptionError.userNotFound
+                }
+
+                return user
+            }
+    }
+
+    private func requestProject() -> Future<Project> {
+        Log.info("Request project")
+
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, Project?)>? in
+                let builder = Project.query(on: connection)
+                    .filter(\Project.name, .equal, "ЯКИТОРИЯ | IOS")
+                return builder
+                    .first()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> Project? in
+                result.0.close()
+                return result.1
+            })
+            .map { (project) -> Project in
+                guard let project = project else {
+                    throw ExeptionError.projectNotFound
+                }
+
+                return project
+            }
+    }
+
+    private func requestIssueRelationships(projectId: Int, userId: Int) -> Future<[IssueRelationship]> {
+
+        return requestAllIssues(projectId: projectId)
+            .thenFuture { (issues) -> EventLoopFuture<[IssueWithTimeEntries]>? in
+                var issuesMap: [Int: IssueWithTimeEntries] = [:]
+
+                for issue in issues {
+                    if let id = issue.id {
+                        issuesMap[id] = IssueWithTimeEntries(issue: issue)
+                    }
+                }
+
+                return self.requestTimeEntries(userId: userId, projectId: projectId)
+                    .map { (timeEntries) -> ([IssueWithTimeEntries]) in
+
+                        for timeEntiry in timeEntries {
+                            issuesMap[timeEntiry.issue_id]?.timeEntries.append(timeEntiry)
+                        }
+
+                        return Array(issuesMap.values)
+                    }
+            }
+            .thenFuture { (issues) -> EventLoopFuture<[IssueRelationship]>? in
+                return self.requestRootIssues(projectId: projectId)
+                    .map { (rootIssues) -> ([IssueRelationship]) in
+                        var issuesMap: [Int: IssueRelationship] = [:]
+
+                        for issue in rootIssues {
+                            if let id = issue.id {
+                                issuesMap[id] = issue
+                            }
+                        }
+
+                        for issue in issues {
+                            issuesMap[issue.issue.root_id]?.childs.append(issue)
+                        }
+
+                        return Array(issuesMap.values)
+                    }
+            }
+    }
+
+    /**
+     Запрашиваем задачи с внешнеми оценками (запрашиваем все рут задачи)
+     */
+    private func requestRootIssues(projectId: Int) -> Future<[IssueRelationship]> {
+        Log.info("Request root issues")
+
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, [IssueRelationship])>? in
+                let builder = Issue.query(on: connection)
+                    .filter(\TimeEntries.project_id, .equal, projectId)
+                    .join(\CustomValue.customized_id, to: \Issue.id)
+                    .filter(\CustomValue.custom_field_id, .equal, 14)
+                    .alsoDecode(CustomValue.self)
+
+                return builder
+                    .all()
+                    .map({ (response) -> ([IssueRelationship]) in
+                        return response.map({ (item) -> IssueRelationship in
+                            let (issue, customValue) = item
+                            let time = customValue.value.timeInterval
+                            let rootIssue = IssueWithTimeEntries(issue: issue)
+                            return IssueRelationship(rootIssue: rootIssue, time: time)
+                        })
+                    })
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [IssueRelationship] in
+                result.0.close()
+                return result.1
+            })
+    }
+
+    /**
+     Запрашиваем все задачи по проекту
+     */
+    private func requestAllIssues(projectId: Int) -> Future<[Issue]> {
+        Log.info("Request all issues")
+
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, [Issue])>? in
+                let builder = Issue.query(on: connection)
+                    .filter(\TimeEntries.project_id, .equal, projectId)
+
+                return builder
+                    .all()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [Issue] in
+                result.0.close()
+                return result.1
+            })
+    }
+
+    /**
+     Запрашиваем все затреканные часы по пользователю внутри проекта
+     */
+    private func requestTimeEntries(userId: Int, projectId: Int) -> Future<[TimeEntries]> {
+        Log.info("Request time entries")
+
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, [TimeEntries])>? in
+                let builder = TimeEntries.query(on: connection)
+                    .filter(\TimeEntries.user_id, .equal, userId)
+                    .filter(\TimeEntries.project_id, .equal, projectId)
+                return builder
+                    .all()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [TimeEntries] in
+                result.0.close()
+                return result.1
+            })
+    }
+
+    private class IssueRelationship {
+        let rootIssue: IssueWithTimeEntries
+        let time: Double
+
+        var childs: [IssueWithTimeEntries] = []
+
+        var id: Int? {
+            return rootIssue.issue.id
         }
 
-        var users = Array(usersInfo.keys)
-        users.sort(by: { $0.name < $1.name })
-
-        let items = users.map { (user) -> String in
-            let timeEntries = usersInfo[user] ?? []
-            let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
-            return "\(time.hoursIcon) \(user.name): \(time.hoursString)"
+        var trackedHours: Float {
+            return childs.reduce(0, { $0 + $1.trackedHours })
         }
 
-        let department = request.groupRequest.departmentRequest.department
-        let group = request.groupRequest.group
-
-        let text = "Отчет \(department): \(group) за \(date.stringYYYYMMdd)\n\n" + items.joined(separator: "\n")
-
-        do {
-            _ = try self.send(chatID: chatID, text: text)
-        } catch {
-            Log.error("\(error)")
+        init(rootIssue: IssueWithTimeEntries, time: Double) {
+            self.rootIssue = rootIssue
+            self.time = time
         }
     }
 
-    func sendHours(chatID: Int64, error: Error) {
-        let errorText = "Не удалось выполнить команду /hours"
-        sendIn(chatID: chatID, text: errorText, error: error)
+    private class IssueWithTimeEntries {
+        let issue: Issue
+        var timeEntries: [TimeEntries] = []
+
+        var trackedHours: Float {
+            return timeEntries.reduce(0, { $0 + $1.hours })
+        }
+
+        init(issue: Issue) {
+            self.issue = issue
+        }
     }
 }
 
-// MARK: - Data
-
-private extension HoursController {
-
-    func date(request: HoursPeriodRequest) -> Date {
-        let date: Date
-
-        switch request.period {
-        case .today:
-            date = Date()
-        case .yesterday:
-            date = Date().addingTimeInterval(-86_400) // -сутки
-        }
-
-        return date
-    }
-}
-*/

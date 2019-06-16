@@ -9,6 +9,22 @@ import Foundation
 
 extension String {
 
+    var timeInterval: Double {
+        guard isEmpty else {
+            return 0
+        }
+
+        let items = components(separatedBy: ":")
+            .compactMap { Double($0) }
+
+        guard items.count == 2, let hours = items.first, let minutes = items.last else {
+            return 0
+        }
+
+
+        return hours * 60 + minutes
+    }
+
     var urlFirstComponent: String? {
         guard let endIndex = range(of: "/")?.lowerBound else {
             return nil
