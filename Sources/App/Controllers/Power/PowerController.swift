@@ -28,15 +28,22 @@ class PowerController: ParentController, CommandsHandler {
     }
 
     private func power(_ update: Update, _ context: BotContext?) throws {
-        guard let chatID = update.message?.chat.id else {
+        guard let message = update.message else {
+            return
+        }
+
+        let parameters = message.text?.urlParameters
+        Log.info("Original text \(String(describing: message.text)) >> parameters \(String(describing: parameters))")
+
+        guard let userId = Int(parameters?["user"] ?? ""), let projectName = parameters?["project"] else {
             return
         }
 
         Log.info("Start request power")
 
-        requestUser()
+        requestUser(id: userId)
             .thenFuture { (user) -> EventLoopFuture<(User, Project)>? in
-                return self.requestProject()
+                return self.requestProject(name: projectName)
                     .map { (user, $0)}
             }
             .thenFuture { (data) -> EventLoopFuture<(User, Project, [IssueRelationship])>? in
@@ -81,20 +88,20 @@ class PowerController: ParentController, CommandsHandler {
                 let text = "**\(user.name) \(project.name)**\n\n" + issuesStrings.joined(separator: "\n")
 
                 do {
-                    _ = try self.send(chatID: chatID, text: text)
+                    _ = try self.send(chatID: message.chat.id, text: text)
                 } catch {
                     Log.error("\(error)")
                 }
             }
     }
 
-    private func requestUser() -> Future<User> {
+    private func requestUser(id: Int) -> Future<User> {
         Log.info("Request user")
 
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection, User?)>? in
                 let builder = User.query(on: connection)
-                    .filter(\User.id, .equal, 285)
+                    .filter(\User.id, .equal, id)
                 return builder
                     .first()
                     .map { (connection, $0) }
@@ -112,13 +119,13 @@ class PowerController: ParentController, CommandsHandler {
             }
     }
 
-    private func requestProject() -> Future<Project> {
+    private func requestProject(name: String) -> Future<Project> {
         Log.info("Request project")
 
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection, Project?)>? in
                 let builder = Project.query(on: connection)
-                    .filter(\Project.name, .equal, "ЯКИТОРИЯ | IOS")
+                    .filter(\Project.name, .equal, name)
                 return builder
                     .first()
                     .map { (connection, $0) }
@@ -210,8 +217,6 @@ class PowerController: ParentController, CommandsHandler {
                             }
 
                             let time = customValue.value.timeInterval
-                            Log.info("Convert \(customValue.value) >> \(time)")
-
                             let rootIssue = IssueWithTimeEntries(issue: issue)
                             return IssueRelationship(rootIssue: rootIssue, time: time)
                         }
