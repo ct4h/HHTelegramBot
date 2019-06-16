@@ -39,6 +39,8 @@ class PowerController: ParentController, CommandsHandler {
             return
         }
 
+        let debugMode = parameters?["debugMode"] != nil
+
         Log.info("Start request power")
 
         requestUser(id: userId)
@@ -86,8 +88,11 @@ class PowerController: ParentController, CommandsHandler {
                     let totalTime = issue.allTrackerHours
 
                     let power = ((totalTime - futureTime) * trackedTime / (totalTime * futureTime)) + 1
-
                     powers.append(power)
+
+                    if !debugMode {
+                        return nil
+                    }
 
                     let futureTimeString = "Оценка: \(futureTime.hoursString)h"
                     let totalTimeString = "Всего: \(totalTime.hoursString)h"
