@@ -17,6 +17,7 @@ final class Issue: MySQLModel, Hashable {
     var project_id: Int
     var subject: String
     var root_id: Int
+    var status_id: Int
 
     init(
         id: Int,
@@ -24,7 +25,8 @@ final class Issue: MySQLModel, Hashable {
         customized_id: Int,
         project_id: Int,
         subject: String,
-        root_id: Int
+        root_id: Int,
+        status_id: Int
         ) {
 
         self.id = id
@@ -32,6 +34,7 @@ final class Issue: MySQLModel, Hashable {
         self.project_id = project_id
         self.subject = subject
         self.root_id = root_id
+        self.status_id = status_id
     }
 
     func hash(into hasher: inout Hasher) {

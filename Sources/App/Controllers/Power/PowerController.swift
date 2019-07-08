@@ -61,6 +61,26 @@ class PowerController: ParentController, CommandsHandler {
             .whenSuccess { (data) in
                 let (user, project, issues) = data
 
+                var allTrackedTime: Float = 0
+                var allFutureTime: Float = 0
+
+                issues.forEach({ (issue) in
+                    guard issue.closed else {
+                        return
+                    }
+
+                    let trackedTime = issue.userTrackedHours
+
+                    guard trackedTime != 0 else {
+                        return
+                    }
+
+
+                    allTrackedTime += trackedTime
+                    allFutureTime += trackedTime * Float(issue.time) / issue.allTrackerHours
+                })
+
+                /*
                 let sortedIssues = issues.sorted(by: { (lhs, rhs) -> Bool in
                     return (lhs.id ?? 0) < (rhs.id ?? 0)
                 })
@@ -109,7 +129,10 @@ class PowerController: ParentController, CommandsHandler {
                 }
 
                 let avgPower = powers.reduce(0, +) / Float(powers.count)
-                let text = "*\(user.name) \(project.name) \(avgPower)*\n\n" + issuesStrings.joined(separator: "\n\n")
+ */
+
+                let avgPower = allTrackedTime / allFutureTime
+                let text = "*\(user.name) \(project.name) \(avgPower)*\n\n" + "Затрекал \(allTrackedTime) | Проданно \(allFutureTime)"
 
                 do {
                     _ = try self.send(chatID: message.chat.id, text: text)
@@ -353,6 +376,10 @@ class PowerController: ParentController, CommandsHandler {
             return rootIssue.issue.id
         }
 
+        var closed: Bool {
+            return rootIssue.closed
+        }
+
         var userTrackedHours: Float {
             return childs.reduce(0, { $0 + $1.userTrackedHours })
         }
@@ -378,6 +405,10 @@ class PowerController: ParentController, CommandsHandler {
 
         var allTrackerHours: Float {
             return allTimeEntries.reduce(0, { $0 + $1.hours })
+        }
+
+        var closed: Bool {
+            return issue.status_id == 5
         }
 
         init(issue: Issue) {
