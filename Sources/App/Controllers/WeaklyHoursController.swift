@@ -112,13 +112,15 @@ extension WeaklyHoursController: HoursControllerView {
                     }
 
                     let result = (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
-                    return result
+                    return "``\(result)``"
             }
 
             //        let department = request.groupRequest.departmentRequest.department
             //        let group = request.groupRequest.group
 
-            let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
+//            let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
+
+            let text = "Рейтинг @ct44h"
 
             do {
                 _ = try self.send(chatID: chatID, text: text)
