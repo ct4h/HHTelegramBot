@@ -105,22 +105,20 @@ extension WeaklyHoursController: HoursControllerView {
 
                     if let nicknameValue = nicknameValue {
                         if nicknameValue.value.first != "@" {
-                            nickname = "@channel" + nicknameValue.value
+                            nickname = "@" + nicknameValue.value
                         } else {
                             nickname = nicknameValue.value
                         }
                     }
 
-                    let result = (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
-                    return "``\(result)``"
+                    return " " + (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
             }
 
             //        let department = request.groupRequest.departmentRequest.department
             //        let group = request.groupRequest.group
 
-//            let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
-
-            let text = "Рейтинг @ct44h @antaresmm"
+            let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
+//            let text = "Рейтинг @ct44h @antaresmm"
 
             do {
                 _ = try self.send(chatID: chatID, text: text)
