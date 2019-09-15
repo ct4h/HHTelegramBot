@@ -88,11 +88,18 @@ extension WeaklyHoursController: HoursControllerView {
         var users = Array(usersInfo.keys)
         users.sort(by: { $0.name < $1.name })
 
-        let items = users.map { (user) -> String in
-            let timeEntries = usersInfo[user] ?? []
-            let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
-            return "\(time.hoursIcon) \(user.name): \(time.hoursString)"
-        }
+        let items = users
+            .map { (user) -> (User, Float) in
+                let timeEntries = usersInfo[user] ?? []
+                let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
+                return (user, time)
+            }
+            .compactMap { $0.1 < 38.0 ? $0 : nil }
+            .map { (value) -> String in
+                let (user, hours) = value
+                return "\(user.name): \(hours.hoursString)"
+            }
+
 
         let department = request.groupRequest.departmentRequest.department
         let group = request.groupRequest.group
