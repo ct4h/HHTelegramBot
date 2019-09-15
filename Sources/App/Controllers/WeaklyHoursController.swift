@@ -112,7 +112,7 @@ extension WeaklyHoursController: HoursControllerView {
                     }
 
                     let result = (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
-                    return "``\(result)``"
+                    return result
             }
 
             //        let department = request.groupRequest.departmentRequest.department
