@@ -53,18 +53,24 @@ class HoursController: ParentController, CommandsHandler, InlineCommandsHandler 
 
         if let request = HoursPeriodRequest(query: query) {
             if let provider = provider {
+                Log.info("Forward query \(query) to provider")
                 provider(chatID, query)
             } else {
+                Log.info("Handle request")
                 handle(chatID: chatID, request: request, view: self)
             }
             return nil
         } else if let request = HoursGroupRequest(query: query) {
+            Log.info("HoursPeriodsRequestFactory")
             factory = HoursPeriodsRequestFactory(chatID: chatID, parentRequest: request, worker: env.worker)
         } else if let request = HoursDepartmentRequest(query: query) {
+            Log.info("HoursGroupsRequestFactory")
             factory = HoursGroupsRequestFactory(chatID: chatID, parentRequest: request, container: env.container)
         } else if let request = HoursDepartmentsRequest(query: query) {
+            Log.info("HoursDepartmentsRequestFactory")
             factory = HoursDepartmentsRequestFactory(chatID: chatID, parentRequest: request, container: env.container)
         } else {
+            Log.info("nil")
             return nil
         }
 
