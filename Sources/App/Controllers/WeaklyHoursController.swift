@@ -28,14 +28,17 @@ class WeaklyHoursController: ParentController, CommandsHandler, InlineCommandsHa
 
     private func weaklyReport(_ update: Update, _ context: BotContext?) throws {
         guard let delegate = delegate else {
+            Log.info("Delegate not found")
             return
         }
 
         guard let chatID = update.message?.chat.id else {
+            Log.info("Chat id not found")
             return
         }
 
         try delegate.inline(query: inlineContext, chatID: chatID, provider: nil)?.throwingSuccess({ (request) in
+            Log.info("Send inline commands \(chatID) request \(request.context)")
             try self.sendInlineCommands(chatID: chatID, request: request)
         })
     }
