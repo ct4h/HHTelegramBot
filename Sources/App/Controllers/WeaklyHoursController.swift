@@ -111,9 +111,7 @@ extension WeaklyHoursController: HoursControllerView {
                         }
                     }
 
-                    if nickname == "@tasya_murmur" {
-                        nickname = ""
-                    }
+                    nickname = nickname.replacingOccurrences(of: "_", with: "\\_")
 
                     let result = (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
                     Log.info("\(result)")
