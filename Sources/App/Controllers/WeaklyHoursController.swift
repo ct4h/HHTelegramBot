@@ -95,16 +95,16 @@ extension WeaklyHoursController: HoursControllerView {
                 return (user, time)
             }
             .compactMap { $0.1 < 38.0 ? $0 : nil }
+            .sorted(by: { $0.1 < $1.1 })
             .map { (value) -> String in
                 let (user, hours) = value
                 return "\(user.name): \(hours.hoursString)"
             }
 
+//        let department = request.groupRequest.departmentRequest.department
+//        let group = request.groupRequest.group
 
-        let department = request.groupRequest.departmentRequest.department
-        let group = request.groupRequest.group
-
-        let text = "Отчет \(department): \(group) за \(date.stringYYYYMMdd)\n\n" + items.joined(separator: "\n")
+        let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
 
         do {
             _ = try self.send(chatID: chatID, text: text)

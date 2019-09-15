@@ -154,7 +154,7 @@ extension HoursController: HoursControllerProvider {
                 if let fromDate = reportDate.from, let toDate = reportDate.to {
                     builder = builder
                         .filter(\TimeEntries.spent_on, .greaterThanOrEqual, fromDate)
-                        .filter(\TimeEntries.spent_on, .lessThanOrEqual, toDate)
+                        .filter(\TimeEntries.spent_on, .lessThan, toDate)
                 } else if let reportDate = reportDate.to {
                     builder = builder
                         .filter(\TimeEntries.spent_on, .equal, reportDate)
