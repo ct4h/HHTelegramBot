@@ -105,7 +105,7 @@ extension WeaklyHoursController: HoursControllerView {
 
                     if let nicknameValue = nicknameValue {
                         if nicknameValue.value.first != "@" {
-                            nickname = "@" + nicknameValue.value
+                            nickname = "@channel" + nicknameValue.value
                         } else {
                             nickname = nicknameValue.value
                         }
