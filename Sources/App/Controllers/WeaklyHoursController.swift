@@ -111,7 +111,11 @@ extension WeaklyHoursController: HoursControllerView {
                         }
                     }
 
-                    let result = " " + (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
+                    if nickname == "@tasya_murmur" {
+                        nickname = ""
+                    }
+
+                    let result = (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
                     Log.info("\(result)")
                     return result
             }
