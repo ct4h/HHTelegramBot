@@ -92,7 +92,7 @@ extension WeaklyHoursController: HoursControllerView {
                     let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
                     return (user, time)
                 }
-                .compactMap { $0.1 < 38.0 ? $0 : nil }
+                .compactMap { ($0.1 > 0 && $0.1 < 38.0) ? $0 : nil }
                 .sorted(by: { $0.1 < $1.1 })
                 .map { (value) -> String in
                     let (user, hours) = value
