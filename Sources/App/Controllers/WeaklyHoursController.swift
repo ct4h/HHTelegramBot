@@ -120,7 +120,7 @@ extension WeaklyHoursController: HoursControllerView {
 
 //            let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
 
-            let text = "Рейтинг @ct44h"
+            let text = "Рейтинг @ct44h @antaresmm"
 
             do {
                 _ = try self.send(chatID: chatID, text: text)
