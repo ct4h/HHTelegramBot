@@ -80,7 +80,7 @@ struct RuntimeArguments {
             if let value = Environment.get(Keys.port.rawValue) {
                 port = Int(value) ?? 0
             } else {
-                port = 3306
+                port = 3360
             }
 
             if let value = Environment.get(Keys.username.rawValue) {
