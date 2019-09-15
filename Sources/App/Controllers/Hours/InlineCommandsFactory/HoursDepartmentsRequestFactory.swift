@@ -53,7 +53,11 @@ private extension HoursDepartmentsRequestFactory {
                     .sort(\.name, .ascending)
 
                 return builder.all()
-            }.map { $0.map { $0.name } }
+            }
+            .map { $0.map { $0.name } }
+            .catch({ (error) in
+                Log.error("Request error \(error)")
+            })
     }
 
     var title: String {
