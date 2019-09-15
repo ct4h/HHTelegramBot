@@ -8,6 +8,7 @@
 import Foundation
 import Vapor
 import FluentSQL
+import LoggerAPI
 
 class HoursDepartmentsRequestFactory: InlineCommandsRequestFactory {
 
@@ -26,6 +27,7 @@ class HoursDepartmentsRequestFactory: InlineCommandsRequestFactory {
         let title = self.title
 
         return customFields.map { (customFields) -> InlineCommandsRequest in
+            Log.info("Extract fields \(customFields)")
             let values = customFields.map { (customField) -> InlineButtonData in
                 let query = HoursDepartmentRequest(departmentsRequest: parentRequest, department: customField).query
                 return InlineButtonData(title: customField, query: query)
@@ -43,6 +45,8 @@ private extension HoursDepartmentsRequestFactory {
     var customFields: Future<[String]> {
         return container.newConnection(to: .mysql)
             .flatMap { (connection) -> EventLoopFuture<[CustomField]> in
+                Log.info("Make connection")
+
                 let builder = CustomField.query(on: connection)
                     .filter(\CustomField.type == "UserCustomField")
                     .filter(\CustomField.field_format == "list")
