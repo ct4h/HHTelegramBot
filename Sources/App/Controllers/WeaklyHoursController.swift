@@ -67,54 +67,85 @@ class WeaklyHoursController: ParentController, CommandsHandler, InlineCommandsHa
 extension WeaklyHoursController: HoursControllerView {
 
     func sendHours(chatID: Int64, request: HoursPeriodRequest, date: (from: Date?, to: Date?), response: DBHoursResponse) {
-        guard chatID != 0, let date = date.to else {
+        guard chatID != 0 else {
             return
         }
 
-        var usersInfo: [User: [TimeEntries]] = [:]
+        requestNicknames().whenSuccess { (nicknames) in
+            var usersInfo: [User: [TimeEntries]] = [:]
 
-        for (user, projects) in response {
-            var timeEntries = usersInfo[user] ?? []
+            for (user, projects) in response {
+                var timeEntries = usersInfo[user] ?? []
 
-            for (_, issues) in projects {
-                for value in issues.values {
-                    timeEntries += value
+                for (_, issues) in projects {
+                    for value in issues.values {
+                        timeEntries += value
+                    }
                 }
+
+                usersInfo[user] = timeEntries
             }
 
-            usersInfo[user] = timeEntries
-        }
+            let items = Array(usersInfo.keys)
+                .map { (user) -> (User, Float) in
+                    let timeEntries = usersInfo[user] ?? []
+                    let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
+                    return (user, time)
+                }
+                .compactMap { $0.1 < 38.0 ? $0 : nil }
+                .sorted(by: { $0.1 < $1.1 })
+                .map { (value) -> String in
+                    let (user, hours) = value
 
-        var users = Array(usersInfo.keys)
-        users.sort(by: { $0.name < $1.name })
+                    let nicknameValue = nicknames.first(where: { (nickname) -> Bool in
+                        return user.id == nickname.customized_id
+                    })
 
-        let items = users
-            .map { (user) -> (User, Float) in
-                let timeEntries = usersInfo[user] ?? []
-                let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
-                return (user, time)
+                    var nickname: String = ""
+
+                    if let nicknameValue = nicknameValue {
+                        if nicknameValue.value.first != "@" {
+                            nickname = "@" + nicknameValue.value
+                        } else {
+                            nickname = nicknameValue.value
+                        }
+                    }
+
+                    return (nickname.isEmpty ? "" : "\(nickname) ") + "\(user.name): \(hours.hoursString)"
             }
-            .compactMap { $0.1 < 38.0 ? $0 : nil }
-            .sorted(by: { $0.1 < $1.1 })
-            .map { (value) -> String in
-                let (user, hours) = value
-                return "\(user.name): \(hours.hoursString)"
+
+            //        let department = request.groupRequest.departmentRequest.department
+            //        let group = request.groupRequest.group
+
+            let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
+
+            do {
+                _ = try self.send(chatID: chatID, text: text)
+            } catch {
+                Log.error("\(error)")
             }
-
-//        let department = request.groupRequest.departmentRequest.department
-//        let group = request.groupRequest.group
-
-        let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
-
-        do {
-            _ = try self.send(chatID: chatID, text: text)
-        } catch {
-            Log.error("\(error)")
         }
     }
 
     func sendHours(chatID: Int64, error: Error) {
         let errorText = "Не удалось выполнить команду /weaklyHours"
         sendIn(chatID: chatID, text: errorText, error: error)
+    }
+
+    private func requestNicknames() -> Future<[CustomValue]> {
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, [CustomValue])>? in
+                let builder = CustomValue.query(on: connection)
+                    .join(\CustomField.id, to: \CustomValue.custom_field_id)
+                    .filter(\CustomField.name, .equal, "Telegram аккаунт")
+
+                return builder
+                    .all()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [CustomValue] in
+                result.0.close()
+                return result.1
+            })
     }
 }
