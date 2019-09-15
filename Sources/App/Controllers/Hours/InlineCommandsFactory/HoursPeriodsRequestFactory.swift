@@ -46,7 +46,7 @@ class HoursPeriodsRequestFactory: InlineCommandsRequestFactory {
 private extension HoursPeriodsRequestFactory {
 
     var periods: [HoursPeriod] {
-        return [.today, .yesterday]
+        return [.today, .yesterday, .weak]
     }
 
     var title: String {
@@ -62,6 +62,8 @@ private extension HoursPeriod {
             return "За сегодня"
         case .yesterday:
             return "За вчера"
+        case .weak:
+            return "За неделю"
         }
     }
 }

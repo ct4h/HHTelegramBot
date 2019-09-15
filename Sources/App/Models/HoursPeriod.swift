@@ -10,4 +10,5 @@ import Foundation
 enum HoursPeriod: String {
     case today = "t"
     case yesterday = "y"
+    case weak = "w"
 }

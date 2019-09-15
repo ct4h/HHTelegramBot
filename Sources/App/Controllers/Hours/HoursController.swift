@@ -13,7 +13,7 @@ import FluentSQL
 import MySQL
 
 protocol HoursControllerView {
-    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: Date, response: DBHoursResponse)
+    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: (from: Date?, to: Date?), response: DBHoursResponse)
     func sendHours(chatID: Int64, error: Error)
 }
 
@@ -83,9 +83,7 @@ extension HoursController: HoursControllerProvider {
     }
 
     private func handle(chatID: Int64, request: HoursPeriodRequest, view: HoursControllerView) {
-        guard let reportDate = date(request: request).zeroTimeDate else {
-            return
-        }
+        let reportDate = date(request: request)
 
         Log.info("[1] report date \(reportDate)")
 
@@ -127,26 +125,34 @@ extension HoursController: HoursControllerProvider {
             })
     }
 
-    private func requestTimeEntries(request: HoursPeriodRequest, reportDate: Date) -> Future<DBHoursResponse> {
+    private func requestTimeEntries(request: HoursPeriodRequest, reportDate: (from: Date?, to: Date?)) -> Future<DBHoursResponse> {
         let fieldName = request.groupRequest.departmentRequest.department
         let fieldValue = request.groupRequest.group
         Log.info("[2] report date \(reportDate) CustomField.name \(fieldName) CustomValue.value \(fieldValue)")
 
         return env.container.newConnection(to: .mysql)
             .thenFuture { (connection) -> Future<(MySQLConnection,DBHoursResponse)>? in
-                let builder = User.query(on: connection)
+                var builder = User.query(on: connection)
                     .filter(\User.status, .equal, 1)
                     .join(\CustomValue.customized_id, to: \User.id)
                     .join(\CustomField.id, to: \CustomValue.custom_field_id)
                     .filter(\CustomField.name, .equal, fieldName)
                     .filter(\CustomValue.value, .equal, fieldValue)
                     .join(\TimeEntries.user_id, to: \User.id)
-                    .filter(\TimeEntries.spent_on, .equal, reportDate)
                     .join(\Issue.id, to: \TimeEntries.issue_id)
                     .join(\Project.id, to: \TimeEntries.project_id)
                     .alsoDecode(TimeEntries.self)
                     .alsoDecode(Issue.self)
                     .alsoDecode(Project.self)
+
+                if let fromDate = reportDate.from, let toDate = reportDate.to {
+                    builder = builder
+                        .filter(\TimeEntries.spent_on, .greaterThanOrEqual, fromDate)
+                        .filter(\TimeEntries.spent_on, .lessThanOrEqual, toDate)
+                } else if let reportDate = reportDate.to {
+                    builder = builder
+                        .filter(\TimeEntries.spent_on, .equal, reportDate)
+                }
 
                 return builder
                     .all()
@@ -164,8 +170,8 @@ extension HoursController: HoursControllerProvider {
 
 extension HoursController: HoursControllerView {
 
-    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: Date, response: DBHoursResponse) {
-        guard chatID != 0 else {
+    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: (from: Date?, to: Date?), response: DBHoursResponse) {
+        guard chatID != 0, let date = date.to else {
             return
         }
 
@@ -214,16 +220,22 @@ extension HoursController: HoursControllerView {
 
 private extension HoursController {
 
-    func date(request: HoursPeriodRequest) -> Date {
-        let date: Date
+    func date(request: HoursPeriodRequest) -> (from: Date?, to: Date?) {
+        let fromDate: Date?
+        let toDate: Date?
 
         switch request.period {
         case .today:
-            date = Date()
+            fromDate = nil
+            toDate = Date().zeroTimeDate
         case .yesterday:
-            date = Date().addingTimeInterval(-86_400) // -сутки
+            fromDate = nil
+            toDate = Date().addingTimeInterval(-86_400).zeroTimeDate // -сутки
+        case .weak:
+            fromDate = Date().addingTimeInterval(-86_400 * 6).zeroTimeDate // начало неделю
+            toDate = Date().addingTimeInterval(86_400).zeroTimeDate // конец недели
         }
 
-        return date
+        return (fromDate, toDate)
     }
 }

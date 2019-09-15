@@ -59,11 +59,11 @@ class SubscriptionController: ParentController, CommandsHandler, InlineCommandsH
             return nil
         }
 
-        func check(_ child: InlineCommandsHandler) -> Bool {
-            let pattern = "^\(inlineContext)/\(child.inlineContext)(.+)?$"
-            Log.info("pattern \(pattern)")
-            return query.matchRegexp(pattern: pattern)
-        }
+//        func check(_ child: InlineCommandsHandler) -> Bool {
+//            let pattern = "^\(inlineContext)/\(child.inlineContext)(.+)?$"
+//            Log.info("pattern \(pattern)")
+//            return query.matchRegexp(pattern: pattern)
+//        }
 
         let handler = childHandlers.first { (child) -> Bool in
             return query.matchRegexp(pattern: "^\(inlineContext)/\(child.inlineContext)(.+)?$")

@@ -8,8 +8,9 @@ final class RedmineBot: ServiceType {
     private let bot: Bot
     private let worker: Worker = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-    private let hoursControllers: HoursController
-    private let userReportControllers: UserReportController
+    private let hoursController: HoursController
+    private let userReportController: UserReportController
+    private let weaklyHoursController: WeaklyHoursController
     private let subscriptionController: SubscriptionController
 
     var updater: Updater?
@@ -27,14 +28,17 @@ final class RedmineBot: ServiceType {
 
         let controllerEnv = BotControllerEnv(bot: bot, constants: constants, worker: worker, container: container)
 
-        hoursControllers = HoursController(env: controllerEnv)
+        hoursController = HoursController(env: controllerEnv)
 
-        userReportControllers = UserReportController(env: controllerEnv)
-        userReportControllers.delegate = hoursControllers
+        userReportController = UserReportController(env: controllerEnv)
+        userReportController.delegate = hoursController
+
+        weaklyHoursController = WeaklyHoursController(env: controllerEnv)
+        weaklyHoursController.delegate = hoursController
 
         subscriptionController = SubscriptionController(env: controllerEnv)
-        subscriptionController.add(child: hoursControllers)
-        subscriptionController.add(child: userReportControllers)
+        subscriptionController.add(child: hoursController)
+        subscriptionController.add(child: userReportController)
 
         let dispatcher = try configureDispatcher()
         self.dispatcher = dispatcher
@@ -60,10 +64,10 @@ final class RedmineBot: ServiceType {
     // MARK: - Helpers
 
     private var commandHandlers: [CommandsHandler] {
-        return [hoursControllers, userReportControllers, subscriptionController]
+        return [hoursController, userReportController, weaklyHoursController, subscriptionController]
     }
 
     private var inlineCommmandHandlers: [InlineCommandsHandler] {
-        return [hoursControllers, subscriptionController]
+        return [hoursController, weaklyHoursController, subscriptionController]
     }
 }

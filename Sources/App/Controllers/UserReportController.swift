@@ -139,7 +139,11 @@ private extension UserReportController {
 
 extension UserReportController: HoursControllerView {
 
-    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: Date, response: DBHoursResponse) {
+    func sendHours(chatID: Int64, request: HoursPeriodRequest, date: (from: Date?, to: Date?), response: DBHoursResponse) {
+        guard let date = date.to else {
+            return
+        }
+        
         let dateString = date.stringYYYYMMdd
 
         do {
