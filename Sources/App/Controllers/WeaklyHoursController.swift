@@ -121,7 +121,7 @@ extension WeaklyHoursController: HoursControllerView {
             //        let department = request.groupRequest.departmentRequest.department
             //        let group = request.groupRequest.group
 
-            let text = "Рейтинг не трекающих людей\n\n" + items.joined(separator: "\n")
+            let text = "Рейтинг нетрекающих людей\n\n" + items.joined(separator: "\n")
 //            let text = "Рейтинг @ct44h @antaresmm"
 
             do {
