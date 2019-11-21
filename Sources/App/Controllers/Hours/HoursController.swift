@@ -170,6 +170,22 @@ extension HoursController: HoursControllerProvider {
             })
     }
 
+    private func requestNicknames() -> Future<[CustomValue]> {
+        return env.container.newConnection(to: .mysql)
+            .thenFuture { (connection) -> Future<(MySQLConnection, [CustomValue])>? in
+                let builder = CustomValue.query(on: connection)
+                    .join(\CustomField.id, to: \CustomValue.custom_field_id)
+                    .filter(\CustomField.name, .equal, "Telegram аккаунт")
+
+                return builder
+                    .all()
+                    .map { (connection, $0) }
+            }
+            .map({ (result) -> [CustomValue] in
+                result.0.close()
+                return result.1
+            })
+    }
 }
 
 // MARK: - View
@@ -181,38 +197,59 @@ extension HoursController: HoursControllerView {
             return
         }
 
-        var usersInfo: [User: [TimeEntries]] = [:]
+        requestNicknames().whenSuccess { (nicknames) in
+            var usersInfo: [User: [TimeEntries]] = [:]
 
-        for (user, projects) in response {
-            var timeEntries = usersInfo[user] ?? []
+            for (user, projects) in response {
+                var timeEntries = usersInfo[user] ?? []
 
-            for (_, issues) in projects {
-                for value in issues.values {
-                    timeEntries += value
+                for (_, issues) in projects {
+                    for value in issues.values {
+                        timeEntries += value
+                    }
                 }
+
+                usersInfo[user] = timeEntries
             }
 
-            usersInfo[user] = timeEntries
-        }
+            var users = Array(usersInfo.keys)
+            users.sort(by: { $0.name < $1.name })
 
-        var users = Array(usersInfo.keys)
-        users.sort(by: { $0.name < $1.name })
+            let items = users.map { (user) -> String in
+                let timeEntries = usersInfo[user] ?? []
+                let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
 
-        let items = users.map { (user) -> String in
-            let timeEntries = usersInfo[user] ?? []
-            let time = Float(timeEntries.reduce(0, { $0 + $1.hours}))
-            return "\(time.hoursIcon) \(user.name): \(time.hoursString)"
-        }
+                var nickname: String = ""
 
-        let department = request.groupRequest.departmentRequest.department
-        let group = request.groupRequest.group
+                if time == 0 {
+                    let nicknameValue = nicknames.first(where: { (nickname) -> Bool in
+                        return user.id == nickname.customized_id
+                    })
 
-        let text = "Отчет \(department): \(group) за \(date.stringYYYYMMdd)\n\n" + items.joined(separator: "\n")
+                    if let nicknameValue = nicknameValue {
+                        if nicknameValue.value.first != "@" {
+                            nickname = "@" + nicknameValue.value
+                        } else {
+                            nickname = nicknameValue.value
+                        }
+                    }
 
-        do {
-             _ = try self.send(chatID: chatID, text: text)
-        } catch {
-            Log.error("\(error)")
+                    nickname = nickname.replacingOccurrences(of: "_", with: "\\_") + " "
+                }
+
+                return "\(time.hoursIcon) \(nickname)\(user.name): \(time.hoursString)"
+            }
+
+            let department = request.groupRequest.departmentRequest.department
+            let group = request.groupRequest.group
+
+            let text = "Отчет \(department): \(group) за \(date.stringYYYYMMdd)\n\n" + items.joined(separator: "\n")
+
+            do {
+                 _ = try self.send(chatID: chatID, text: text)
+            } catch {
+                Log.error("\(error)")
+            }
         }
     }
 
