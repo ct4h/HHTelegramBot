@@ -1,0 +1,38 @@
+//
+//  HoursRequest+Users.swift
+//  App
+//
+//  Created by basalaev on 20.01.2020.
+//
+
+import Foundation
+import Async
+import FluentSQL
+import MySQL
+
+// TODO: Добавить поддержку массивов
+
+extension HoursRequest: UsersRequest {
+
+    func all(on connection: MySQLDatabase.Connection) -> Future<[User]> {
+        var builder =  User.query(on: connection)
+            .filter(\User.status == 1)
+
+        if let customField = customFields.first, let customValue = customValues.first {
+            builder = builder
+                .join(\CustomValue.customized_id, to: \User.id)
+                .join(\CustomField.id, to: \CustomValue.custom_field_id)
+                .filter(\CustomField.name, .equal, customField)
+                .filter(\CustomValue.value, .equal, customValue)
+        }
+
+        if let department = departments.first {
+            builder = builder
+                .join(\PeopleInformation.user_id, to: \User.id)
+                .join(\Department.id, to: \PeopleInformation.department_id)
+                .filter(\Department.name, .equal, department)
+        }
+
+        return builder.all()
+    }
+}

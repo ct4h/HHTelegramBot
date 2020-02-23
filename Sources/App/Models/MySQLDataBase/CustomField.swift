@@ -28,6 +28,12 @@ final class CustomField: MySQLModel {
 }
 
 extension CustomField {
+    enum FieldType: String {
+        case user = "UserCustomField"
+    }
+}
+
+extension CustomField {
 
     var values: [String] {
         guard let possible_values = possible_values else {
