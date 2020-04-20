@@ -9,6 +9,7 @@ import Foundation
 import Async
 import FluentSQL
 import MySQL
+import LoggerAPI
 
 // TODO: Добавить поддержку массивов
 
@@ -42,8 +43,13 @@ extension HoursRequest: TimeEntriesRequest {
             let daySeconds: TimeInterval = 86_400
             switch period {
             case .day:
+                let reportDate = date.addingTimeInterval(daysOffset * daySeconds)
+                let reportDateString = DateFormatter.yyyyMMdd.string(from: reportDate)
+
+                Log.info("like \(reportDateString)")
+
                 builder = builder
-                    .filter(\TimeEntries.spent_on, .equal, date.addingTimeInterval(daysOffset * daySeconds))
+                    .filter(MySQLDatabase.queryField(.keyPath(\TimeEntries.spent_on)), .like, reportDateString)
             case .weak:
                 let fromDate = date.addingTimeInterval((-6 + daysOffset) * daySeconds)
                 let toDate = date.addingTimeInterval(daysOffset * daySeconds)
