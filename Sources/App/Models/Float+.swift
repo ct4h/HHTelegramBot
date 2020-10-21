@@ -29,6 +29,10 @@ extension Float {
             return "👑"
         } else if self >= 7.5 {
             return "✅"
+        } else if self >= 6 {
+            return "🐌"
+        } else if self >= 4 {
+            return "🕓"
         } else {
             return "💔"
         }
