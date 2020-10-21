@@ -19,3 +19,13 @@ struct HurmaUser: Decodable {
     let vacation: [String]
     let unpaid_vacation: [String]
 }
+
+extension HurmaUser {
+    func isSick(date: String) -> Bool {
+        return (sick_leave + documented_sick_leave).contains(date)
+    }
+
+    func isVacation(date: String) -> Bool {
+        return (vacation + unpaid_vacation).contains(date)
+    }
+}

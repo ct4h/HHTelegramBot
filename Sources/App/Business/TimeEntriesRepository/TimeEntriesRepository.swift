@@ -58,6 +58,11 @@ struct ProjectResponse {
     var totalTime: Float {
         return issues.reduce(into: 0) { $0 = $0 + $1.totalTime }
     }
+
+    // Время простоев
+    var standTime: Float {
+        return issues.reduce(into: 0) { $0 = $0 + $1.standTime }
+    }
 }
 
 struct IssueResponse {
@@ -66,5 +71,17 @@ struct IssueResponse {
 
     var totalTime: Float {
         return timeEntries.reduce(into: 0) { $0 = $0 + $1.hours }
+    }
+
+    var standTime: Float {
+        if issue.subject.lowercased().contains("простой") {
+            return totalTime
+        } else {
+            return timeEntries.reduce(into: 0) {
+                if $1.comments.lowercased().contains("простой") {
+                    $0 = $0 + $1.hours
+                }
+            }
+        }
     }
 }

@@ -36,7 +36,8 @@ class HoursController: ParentController, CommandsHandler {
         let commands: [String: HoursView] = [
             "/hours": DailyHoursView(),
             "/weaklyHours": WeaklyHoursView(),
-            "/detailHours": DetailDayHoursView()
+            "/detailHours": DetailDayHoursView(),
+            "/hoursWarnings": DailyHoursWarningsView()
         ]
 
         return commands.map { (command) -> CommandHandler in

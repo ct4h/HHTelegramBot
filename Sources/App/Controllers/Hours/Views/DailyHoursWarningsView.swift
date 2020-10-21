@@ -1,13 +1,13 @@
 //
-//  DailyHoursView.swift
+//  DailyHoursWarningsView.swift
 //  App
 //
-//  Created by basalaev on 08.01.2020.
+//  Created by basalaev on 21.10.2020.
 //
 
 import Foundation
 
-class DailyHoursView: HoursView {
+class DailyHoursWarningsView: HoursView {
 
     func convert(responses: [HoursResponse], request: HoursRequest) -> [String] {
         let reportDate = Date().zeroTimeDate?.addingTimeInterval(request.daysOffset * 86_400).stringYYYYMMdd ?? ""
@@ -18,30 +18,32 @@ class DailyHoursView: HoursView {
             }
 
             if response.userInformation.hurmaUser?.isSick(date: reportDate) == true {
-                return "😷 \(response.userInformation.user.name)"
+                return nil
             }
 
             if response.userInformation.hurmaUser?.isVacation(date: reportDate) == true {
-                return "🌴 \(response.userInformation.user.name)"
+                return nil
             }
 
-            let isHalfBet = response.isHalfBet
-            let totalTime = response.projects.reduce(into: 0) { $0 = $0 + $1.totalTime }
-            let hoursIcon = ((isHalfBet ? 2 : 1) * totalTime).hoursIcon
+            let trackedTime = response.projects.reduce(into: 0) { $0 = $0 + $1.totalTime }
+            let standTime = response.projects.reduce(into: 0) { $0 = $0 + $1.standTime }
 
-            var components = [hoursIcon]
+            var components: [String] = []
 
-            if isHalfBet {
-                components.append("[½]")
+            if trackedTime == 0 {
+                components.append(Float(0).hoursIcon)
+            } else if standTime == 0 {
+                components.append("🧍")
+                components.append("\(standTime.hoursString)")
+            } else {
+                return nil
             }
 
-            if totalTime == 0, let nickname = response.nickname {
+            if let nickname = response.nickname {
                 components.append(nickname)
             }
 
             components.append("\(response.userInformation.user.name):")
-            components.append(totalTime.hoursString)
-
             return components.joined(separator: " ")
         }
 
