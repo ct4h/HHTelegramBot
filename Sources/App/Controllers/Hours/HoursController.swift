@@ -13,6 +13,7 @@ import FluentSQL
 import MySQL
 
 class HoursController: ParentController, CommandsHandler {
+    private let hurmaRepository: HurmaRepository
     private let userRepositiry: UsersRepository
     private let timeEntriesRepository: TimeEntriesRepository
 
@@ -20,6 +21,7 @@ class HoursController: ParentController, CommandsHandler {
         if let userRepositiry: UsersRepository = try? env.container.make(), let timeEntriesRepository: TimeEntriesRepository = try? env.container.make() {
             self.userRepositiry = userRepositiry
             self.timeEntriesRepository = timeEntriesRepository
+            self.hurmaRepository = HurmaRepository(worker: env.worker)
         } else {
             fatalError()
         }
@@ -53,22 +55,27 @@ class HoursController: ParentController, CommandsHandler {
 
     private func handler(chatID: Int64, request: HoursRequest, view: HoursView) {
         let usersFuture = userRepositiry.users(request: request)
+        let hurmaUsersFuture = hurmaRepository.users()
         let timeEntriesFuture = timeEntriesRepository.timeEntries(request: request)
 
-        map(usersFuture, timeEntriesFuture) { (users, times) -> [HoursResponse] in
+        map(usersFuture, hurmaUsersFuture, timeEntriesFuture) { (users, hurmaUsers, times) -> [HoursResponse] in
             Log.info("Complete extract users count \(users.count)")
 
             var result: [HoursResponse] = []
 
             users.forEach { (user) in
+                let hurmaUser = hurmaUsers.first(where: { $0.email == user.email })
+
+                let userInfo = HoursResponse.UserInformation(user: user.user, hurmaUser: hurmaUser, fields: user.fields)
+
                 if let time = times.first(where: { $0.userID == user.user.id }) {
-                    result.append(HoursResponse(user: user.user, fields: user.fields, projects: time.projects))
+                    result.append(HoursResponse(userInformation: userInfo, projects: time.projects))
                 } else {
-                    result.append(HoursResponse(user: user.user, fields: user.fields, projects: []))
+                    result.append(HoursResponse(userInformation: userInfo, projects: []))
                 }
             }
 
-            return result.sorted { ($0.user.id ?? 0) < ($1.user.id ?? 0) }
+            return result.sorted { ($0.userInformation.user.id ?? 0) < ($1.userInformation.user.id ?? 0) }
         }
         .map { view.convert(responses: $0, request: request) }
         .mapIfError { (error) -> [String] in

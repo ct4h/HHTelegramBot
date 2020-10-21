@@ -29,9 +29,10 @@ final class UsersRepository: ServiceType {
         return map(usersFuture, customFieldsFuture) { (users, customFields) -> [UserResponse] in
             var result: [UserResponse] = []
 
-            users.forEach { (user) in
+            users.forEach { (userData) in
+                let (user, emailAddress) = userData
                 if let userId = user.id, let fields = customFields[userId] {
-                    result.append(UserResponse(user: user, fields: fields))
+                    result.append(UserResponse(user: user, email: emailAddress.address, fields: fields))
                 }
             }
 

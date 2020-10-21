@@ -14,9 +14,11 @@ import MySQL
 
 extension HoursRequest: UsersRequest {
 
-    func all(on connection: MySQLDatabase.Connection) -> Future<[User]> {
+    func all(on connection: MySQLDatabase.Connection) -> Future<[(User, EmailAddress)]> {
         var builder =  User.query(on: connection)
             .filter(\User.status == 1)
+            .join(\EmailAddress.user_id, to: \User.id)
+            .alsoDecode(EmailAddress.self)
 
         if let customField = customFields.first, let customValue = customValues.first {
             builder = builder
@@ -31,6 +33,13 @@ extension HoursRequest: UsersRequest {
                 .join(\PeopleInformation.user_id, to: \User.id)
                 .join(\Department.id, to: \PeopleInformation.department_id)
                 .filter(\Department.name, .equal, department)
+        }
+
+        if customFields.contains("Филиал"), customValues.contains("Саранск") {
+            builder = builder
+                .join(\PeopleInformation.user_id, to: \User.id)
+                .join(\Department.id, to: \PeopleInformation.department_id)
+                .filter(\Department.parent_id, .equal, 1)
         }
 
         return builder.all()

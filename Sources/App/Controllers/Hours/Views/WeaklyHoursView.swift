@@ -10,23 +10,39 @@ import Foundation
 class WeaklyHoursView: HoursView {
 
     func convert(responses: [HoursResponse], request: HoursRequest) -> [String] {
+        if let date = Date().zeroTimeDate, request.period == .weak {
+            let daySeconds: TimeInterval = 86_400
+
+            return convert(
+                fromDate: date.addingTimeInterval((-6 + request.daysOffset) * daySeconds),
+                toDate: date.addingTimeInterval(request.daysOffset * daySeconds),
+                responses: responses,
+                request: request
+            )
+        }
+
+        return []
+    }
+
+    private func convert(fromDate: Date, toDate: Date, responses: [HoursResponse], request: HoursRequest) -> [String] {
         let items = responses
             .compactMap { (response) -> (Float, String)? in
                 if response.isOutstaff {
                     return nil
                 }
 
-                let isHalfBet = response.isHalfBet
-                let trackedTime = response.projects.reduce(into: 0) { $0 = $0 + $1.totalTime }
-                let totalTime = (isHalfBet ? 2 : 1) * trackedTime
+                let freeDays = response.userInformation.hurmaUser?.freeDaysCount(fromDate: fromDate, toDate: toDate) ?? 0
 
-                // Костыль чтобы не выводить инфу людей в отпуке
-                if totalTime == 0 {
+                if freeDays == 5 {
                     return nil
                 }
 
-                // Отпрасываем людей затрекавших недельную норму
-                if totalTime >= 38.0 {
+                let isHalfBet = response.isHalfBet
+                let trackedTime = response.projects.reduce(into: 0) { $0 = $0 + $1.totalTime }
+                let requiredHours = Float((5 - freeDays) * 8 / (isHalfBet ? 2 : 1))
+                let needTrackedHours = requiredHours - trackedTime
+
+                if needTrackedHours <= 2 {
                     return nil
                 }
 
@@ -42,26 +58,36 @@ class WeaklyHoursView: HoursView {
                     components.append("[½]")
                 }
 
-                components.append(trackedTime.hoursString)
+                components.append(needTrackedHours.hoursString)
 
-                return (totalTime, components.joined(separator: " "))
+                return (needTrackedHours, components.joined(separator: " "))
             }
-            .sorted { $0.0 < $1.0 }
+            .sorted { $0.0 > $1.0 }
             .map { $0.1 }
 
 
-        var components: [String] = ["Рейтинг нетрекающих людей за"]
+        var components: [String] = ["Осталось затрекать за"]
 
-        if let date = Date().zeroTimeDate {
-            let daySeconds: TimeInterval = 86_400
-            if request.period == .weak {
-                let fromDate = date.addingTimeInterval((-6 + request.daysOffset) * daySeconds)
-                let toDate = date.addingTimeInterval(request.daysOffset * daySeconds)
-
-                components.append("\(fromDate.stringYYYYMMdd) - \(toDate.stringYYYYMMdd)")
-            }
-        }
+        components.append("\(fromDate.stringYYYYMMdd) - \(toDate.stringYYYYMMdd)")
 
         return [components.joined(separator: " ") + "\n\n" + items.joined(separator: "\n")]
+    }
+}
+
+private extension HurmaUser {
+
+    func freeDaysCount(fromDate: Date, toDate: Date) -> Int {
+        let dateFormatter = DateFormatter.yyyyMMdd
+
+        let freeDays = (sick_leave + documented_sick_leave + vacation + unpaid_vacation)
+            .compactMap { dateString -> Bool? in
+                if let date = dateFormatter.date(from: dateString) {
+                    return (date >= fromDate && date <= toDate) ? true : nil
+                } else {
+                    return nil
+                }
+            }
+
+        return freeDays.count
     }
 }
