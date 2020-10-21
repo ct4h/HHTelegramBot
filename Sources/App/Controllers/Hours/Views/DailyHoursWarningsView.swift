@@ -32,7 +32,7 @@ class DailyHoursWarningsView: HoursView {
 
             if trackedTime == 0 {
                 components.append(Float(0).hoursIcon)
-            } else if standTime == 0 {
+            } else if standTime != 0 {
                 components.append("🧍")
                 components.append("\(standTime.hoursString)")
             } else {
@@ -43,7 +43,7 @@ class DailyHoursWarningsView: HoursView {
                 components.append(nickname)
             }
 
-            components.append("\(response.userInformation.user.name):")
+            components.append("\(response.userInformation.user.name)")
             return components.joined(separator: " ")
         }
 
