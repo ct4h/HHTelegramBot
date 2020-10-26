@@ -37,7 +37,8 @@ class HoursController: ParentController, CommandsHandler {
             "/hours": DailyHoursView(),
             "/weaklyHours": WeaklyHoursView(),
             "/detailHours": DetailDayHoursView(),
-            "/hoursWarnings": DailyHoursWarningsView()
+            "/hoursWarnings": DailyHoursWarningsView(),
+            "/weaklyOvertimes": WeaklyOvertimeHoursView()
         ]
 
         return commands.map { (command) -> CommandHandler in

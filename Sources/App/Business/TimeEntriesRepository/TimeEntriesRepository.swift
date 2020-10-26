@@ -63,6 +63,11 @@ struct ProjectResponse {
     var standTime: Float {
         return issues.reduce(into: 0) { $0 = $0 + $1.standTime }
     }
+
+    // Время овертаймов
+    var overtime: Float {
+        return issues.reduce(into: 0) { $0 = $0 + $1.overtime }
+    }
 }
 
 struct IssueResponse {
@@ -81,6 +86,14 @@ struct IssueResponse {
                 if $1.comments.lowercased().contains("простой") {
                     $0 = $0 + $1.hours
                 }
+            }
+        }
+    }
+
+    var overtime: Float {
+        return timeEntries.reduce(into: 0) {
+            if $1.activity_id == 25 {
+                $0 = $0 + $1.hours
             }
         }
     }
