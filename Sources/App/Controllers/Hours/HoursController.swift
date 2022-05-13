@@ -13,7 +13,6 @@ import FluentSQL
 import MySQL
 
 class HoursController: ParentController, CommandsHandler {
-    private let hurmaRepository: HurmaRepository
     private let userRepositiry: UsersRepository
     private let timeEntriesRepository: TimeEntriesRepository
 
@@ -21,7 +20,6 @@ class HoursController: ParentController, CommandsHandler {
         if let userRepositiry: UsersRepository = try? env.container.make(), let timeEntriesRepository: TimeEntriesRepository = try? env.container.make() {
             self.userRepositiry = userRepositiry
             self.timeEntriesRepository = timeEntriesRepository
-            self.hurmaRepository = HurmaRepository(worker: env.worker)
         } else {
             fatalError()
         }
@@ -55,18 +53,15 @@ class HoursController: ParentController, CommandsHandler {
 
     private func handler(chatID: Int64, request: HoursRequest, view: HoursView) {
         let usersFuture = userRepositiry.users(request: request)
-        let hurmaUsersFuture = hurmaRepository.users()
         let timeEntriesFuture = timeEntriesRepository.timeEntries(request: request)
 
-        map(usersFuture, hurmaUsersFuture, timeEntriesFuture) { (users, hurmaUsers, times) -> [HoursResponse] in
+        map(usersFuture, timeEntriesFuture) { (users, times) -> [HoursResponse] in
             Log.info("Complete extract users count \(users.count)")
 
             var result: [HoursResponse] = []
 
             users.forEach { (user) in
-                let hurmaUser = hurmaUsers.first(where: { $0.email == user.email })
-
-                let userInfo = HoursResponse.UserInformation(user: user.user, hurmaUser: hurmaUser, fields: user.fields)
+                let userInfo = HoursResponse.UserInformation(user: user.user, fields: user.fields)
 
                 if let time = times.first(where: { $0.userID == user.user.id }) {
                     result.append(HoursResponse(userInformation: userInfo, projects: time.projects))

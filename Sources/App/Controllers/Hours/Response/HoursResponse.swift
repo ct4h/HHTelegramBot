@@ -10,7 +10,6 @@ import Foundation
 struct HoursResponse {
     struct UserInformation {
         let user: User
-        let hurmaUser: HurmaUser?
         let fields: [CustomFieldsResponse]
     }
 

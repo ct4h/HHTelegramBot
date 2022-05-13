@@ -31,15 +31,9 @@ class WeaklyHoursView: HoursView {
                     return nil
                 }
 
-                let freeDays = response.userInformation.hurmaUser?.freeDaysCount(fromDate: fromDate, toDate: toDate) ?? 0
-
-                if freeDays == 5 {
-                    return nil
-                }
-
                 let isHalfBet = response.isHalfBet
                 let trackedTime = response.projects.reduce(into: 0) { $0 = $0 + $1.totalTime }
-                let requiredHours = Float((5 - freeDays) * 8 / (isHalfBet ? 2 : 1))
+                let requiredHours = Float(40 / (isHalfBet ? 2 : 1))
                 let needTrackedHours = requiredHours - trackedTime
 
                 if needTrackedHours <= 2 {
@@ -71,23 +65,5 @@ class WeaklyHoursView: HoursView {
         components.append("\(fromDate.stringYYYYMMdd) - \(toDate.stringYYYYMMdd)")
 
         return [components.joined(separator: " ") + "\n\n" + items.joined(separator: "\n")]
-    }
-}
-
-private extension HurmaUser {
-
-    func freeDaysCount(fromDate: Date, toDate: Date) -> Int {
-        let dateFormatter = DateFormatter.yyyyMMdd
-
-        let freeDays = (sick_leave + documented_sick_leave + vacation + unpaid_vacation)
-            .compactMap { dateString -> Bool? in
-                if let date = dateFormatter.date(from: dateString) {
-                    return (date >= fromDate && date <= toDate) ? true : nil
-                } else {
-                    return nil
-                }
-            }
-
-        return freeDays.count
     }
 }

@@ -15,31 +15,6 @@ struct RuntimeArguments {
         }
     }
 
-    struct Hurma {
-        let host: String
-        let port: Int = 443
-        let token: String
-
-        private enum Keys: String {
-            case host = "HURMA_HOST"
-            case token = "HURMA_ACCESS"
-        }
-
-        init() {
-            if let value = Environment.get(Keys.host.rawValue) {
-                host = value
-            } else {
-                fatalError("Cannot find hurma host")
-            }
-
-            if let value = Environment.get(Keys.token.rawValue) {
-                token = value
-            } else {
-                fatalError("Cannot find hurma token")
-            }
-        }
-    }
-
     struct PSQLDataBase {
         let hostname: String
         let port: Int
