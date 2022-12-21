@@ -46,12 +46,22 @@ class SubscribeController: ParentController, CommandsHandler {
             return
         }
 
+        _ = try? self.send(chatID: chatID, text: "subscribe begin")
+        
         env.container.withPooledConnection(to: .psql) { (connection) -> Future<Subscription> in
             let subscription = Subscription(chatID: chatID, query: text)
             return subscription.save(on: connection)
-        }.whenSuccess { (_) in
+        }
+        .thenIfErrorThrowing { error in
+            _ = try? self.send(chatID: chatID, text: "subscribe \(error)")
+            return Subscription(chatID: chatID, query: "")
+        }
+        .whenSuccess { subscription in
             do {
-                _ = try self.send(chatID: chatID, text: "Команда успешно сохранена")
+                if !subscription.query.isEmpty {
+                    _ = try self.send(chatID: chatID, text: "Команда успешно сохранена")
+                }
+                
                 Log.info("Complete send message")
             } catch {
                 Log.error("Error send message \(error.localizedDescription)")
