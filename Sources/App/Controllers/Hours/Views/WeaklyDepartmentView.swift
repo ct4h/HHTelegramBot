@@ -45,6 +45,10 @@ class WeaklyDepartmentView: HoursView {
                 if isHalfBet {
                     components.append("[½]")
                 }
+                
+                if response.isExternalUser {
+                    components.append("не H&H")
+                }
 
                 components.append(trackedTime.hoursString)
 

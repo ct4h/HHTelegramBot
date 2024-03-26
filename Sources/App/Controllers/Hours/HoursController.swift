@@ -13,14 +13,14 @@ import FluentSQL
 import MySQL
 
 class HoursController: ParentController, CommandsHandler {
-    private let userRepositiry: UsersRepository
+    private let userRepository: UsersRepository
     private let timeEntriesRepository: TimeEntriesRepository
 
     weak var healthLogger: BotHealthLogger?
     
     override init(env: BotControllerEnv) {
-        if let userRepositiry: UsersRepository = try? env.container.make(), let timeEntriesRepository: TimeEntriesRepository = try? env.container.make() {
-            self.userRepositiry = userRepositiry
+        if let userRepository: UsersRepository = try? env.container.make(), let timeEntriesRepository: TimeEntriesRepository = try? env.container.make() {
+            self.userRepository = userRepository
             self.timeEntriesRepository = timeEntriesRepository
         } else {
             fatalError()
@@ -31,13 +31,13 @@ class HoursController: ParentController, CommandsHandler {
 
     // MARK: - CommandsHandler
 
-    // Подписки гнать через dispatcher
     var handlers: [Handler] {
         let commands: [String: HoursView] = [
             "/hours": DailyHoursView(),
             "/weaklyHours": WeaklyHoursView(),
             "/detailHours": DetailDayHoursView(),
             "/weaklyDepartment": WeaklyDepartmentView(),
+            "/nonWorkingHours": NonWorkingHoursView(),
         ]
 
         return commands.map { (command) -> CommandHandler in
@@ -58,7 +58,7 @@ class HoursController: ParentController, CommandsHandler {
     }
 
     private func handler(chatID: Int64, request: HoursRequest, view: HoursView) {
-        let usersFuture = userRepositiry
+        let usersFuture = userRepository
             .users(request: request)
             .mapIfError { error in
                 do {

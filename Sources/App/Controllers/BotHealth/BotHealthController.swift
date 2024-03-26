@@ -17,12 +17,24 @@ protocol BotHealthLogger: AnyObject {
 }
 
 class BotHealthController: ParentController, CommandsHandler, BotHealthLogger {
+    private let userRepository: UsersRepository
+    
+    override init(env: BotControllerEnv) {
+        if let userRepository: UsersRepository = try? env.container.make() {
+            self.userRepository = userRepository
+        } else {
+            fatalError()
+        }
+
+        super.init(env: env)
+    }
     
     // MARK: - CommandsHandler
     
     var handlers: [Handler] {
         return [
-            CommandHandler(commands: ["/health"], callback: health)
+            CommandHandler(commands: ["/health"], callback: health),
+            CommandHandler(commands: ["/users"], callback: users)
         ]
     }
     
@@ -50,6 +62,32 @@ class BotHealthController: ParentController, CommandsHandler, BotHealthLogger {
                 Log.error("Error send message \(error.localizedDescription)")
             }
         }
+    }
+    
+    func users(_ update: Update, _ context: BotContext?) throws {
+        guard let chatID = update.message?.chat.id, let request = HoursRequest(from: update.message?.text) else {
+            return
+        }
+        
+        userRepository
+            .users(request: request)
+            .whenSuccess { users in
+                let text = users
+                    .compactMap { user in
+                        let fields = user.fields
+                            .compactMap { "\($0.name) - \($0.value)" }
+                            .joined(separator: "\n")
+                        
+                        return "\(user.user.name):\n" + fields
+                    }
+                    .joined(separator: "\n\n")
+                
+                do {
+                    _ = try self.send(chatID: chatID, text: text)
+                } catch {
+                    Log.error("Error send message \(error.localizedDescription)")
+                }
+            }
     }
     
     func send(error: String) throws {

@@ -37,6 +37,14 @@ extension HoursResponse {
     var isOutstaff: Bool {
         return (userInformation.fields.first { $0.name == "Outstaff" })?.value.bool ?? false
     }
+    
+    var isExternalUser: Bool {
+        return !isInternalUser
+    }
+    
+    var isInternalUser: Bool {
+        return (userInformation.fields.first { $0.name == "Сотрудник H&H" })?.value.bool ?? false
+    }
 
     var isHalfBet: Bool {
         return (userInformation.fields.first { $0.name == "1/2 ставки" })?.value.bool ?? false
