@@ -45,9 +45,7 @@ extension HoursRequest: TimeEntriesRequest {
             case .day:
                 let reportDate = date.addingTimeInterval(daysOffset * daySeconds)
                 let reportDateString = DateFormatter.yyyyMMdd.string(from: reportDate)
-
-                Log.info("like \(reportDateString)")
-
+                
                 builder = builder
                     .filter(MySQLDatabase.queryField(.keyPath(\TimeEntries.spent_on)), .like, reportDateString)
             case .weak:

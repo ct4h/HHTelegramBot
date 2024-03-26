@@ -16,6 +16,8 @@ class HoursController: ParentController, CommandsHandler {
     private let userRepositiry: UsersRepository
     private let timeEntriesRepository: TimeEntriesRepository
 
+    weak var healthLogger: BotHealthLogger?
+    
     override init(env: BotControllerEnv) {
         if let userRepositiry: UsersRepository = try? env.container.make(), let timeEntriesRepository: TimeEntriesRepository = try? env.container.make() {
             self.userRepositiry = userRepositiry
@@ -34,7 +36,8 @@ class HoursController: ParentController, CommandsHandler {
         let commands: [String: HoursView] = [
             "/hours": DailyHoursView(),
             "/weaklyHours": WeaklyHoursView(),
-            "/detailHours": DetailDayHoursView()
+            "/detailHours": DetailDayHoursView(),
+            "/weaklyDepartment": WeaklyDepartmentView(),
         ]
 
         return commands.map { (command) -> CommandHandler in
@@ -44,20 +47,48 @@ class HoursController: ParentController, CommandsHandler {
                     Log.error("Some error handle command \(command.key)")
                     return
                 }
-
-                Log.info("Handle command \(command.key)")
-                self.handler(chatID: chatID, request: request, view: command.value)
+                
+                self.env.worker.future().whenSuccess { _ in
+                    Log.info("Hadle command \(update.message?.text ?? "?")")
+        
+                    self.handler(chatID: chatID, request: request, view: command.value)
+                }
             }
         }
     }
 
     private func handler(chatID: Int64, request: HoursRequest, view: HoursView) {
-        let usersFuture = userRepositiry.users(request: request)
-        let timeEntriesFuture = timeEntriesRepository.timeEntries(request: request)
+        let usersFuture = userRepositiry
+            .users(request: request)
+            .mapIfError { error in
+                do {
+                    try self.healthLogger?.send(error: "Get users error: \(error)")
+                    
+                    _ = try self.send(chatID: chatID, text: "Users error: \(error)")
+                } catch {
+                    Log.error("Error send message \(error.localizedDescription)")
+                }
+                
+                return []
+            }
+        
+        let timeEntriesFuture = timeEntriesRepository
+            .timeEntries(request: request)
+            .mapIfError { error in
+                do {
+                    try self.healthLogger?.send(error: "Get Time entries error: \(error)")
+                    
+                    _ = try self.send(chatID: chatID, text: "Time entries error: \(error)")
+                } catch {
+                    Log.error("Error send message \(error.localizedDescription)")
+                }
+                
+                return []
+            }
 
         map(usersFuture, timeEntriesFuture) { (users, times) -> [HoursResponse] in
-            Log.info("Complete extract users count \(users.count)")
-
+            Log.error("Parse result users.count \(users.count) times.count \(times.count)")
+            
             var result: [HoursResponse] = []
 
             users.forEach { (user) in
@@ -69,8 +100,16 @@ class HoursController: ParentController, CommandsHandler {
                     result.append(HoursResponse(userInformation: userInfo, projects: []))
                 }
             }
-
-            return result.sorted { ($0.userInformation.user.id ?? 0) < ($1.userInformation.user.id ?? 0) }
+            
+            return result
+                .filter {
+                    guard !request.users.isEmpty, let nickname = $0.nickname else {
+                        return true
+                    }
+       
+                    return request.users.contains(nickname)
+                }
+                .sorted { ($0.userInformation.user.id ?? 0) < ($1.userInformation.user.id ?? 0) }
         }
         .map { view.convert(responses: $0, request: request) }
         .mapIfError { (error) -> [String] in

@@ -17,6 +17,7 @@ struct HoursRequest {
     let customFields: [String]
     let customValues: [String]
     let departments: [String]
+    let users: [String]
     let period: Period
     let daysOffset: TimeInterval
 
@@ -31,6 +32,7 @@ struct HoursRequest {
         customFields = components[safe: "customFields"]?.params ?? []
         customValues = components[safe: "customValues"]?.params ?? []
         departments = components[safe: "departments"]?.params ?? []
+        users = components[safe: "users"]?.params ?? []
 
         if customFields.count == 0, customValues.count == 0, departments.count == 0 {
             Log.error("Filter params not found")
@@ -48,6 +50,6 @@ struct HoursRequest {
             self.daysOffset = daysOffset
         } else {
             self.daysOffset = 0
-        }
+        }    
     }
 }

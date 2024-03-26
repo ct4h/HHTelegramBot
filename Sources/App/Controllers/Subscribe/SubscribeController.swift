@@ -25,7 +25,13 @@ class SubscribeController: ParentController, CommandsHandler {
         super.init(env: env)
 
         scheduler.schedulerHour { [weak self] (time, day) in
-            self?.execute(chatID: nil, time: time, day: day)
+            guard let self = self else {
+                return
+            }
+            
+            self.env.worker.future().whenSuccess { [weak self] _ in
+                self?.execute(chatID: nil, time: time, day: day)
+            }
         }
     }
 
@@ -37,8 +43,38 @@ class SubscribeController: ParentController, CommandsHandler {
             CommandHandler(commands: ["/clear"], callback: remove),
             CommandHandler(commands: ["/force"], callback: force),
             CommandHandler(commands: ["/subscriptions"], callback: subscriptions),
-            CommandHandler(commands: ["/check"], callback: check)
+            CommandHandler(commands: ["/allsubscriptions"], callback: allSubscriptions),
+            CommandHandler(commands: ["/check"], callback: check),
+            CommandHandler(commands: ["/delete"], callback: delete)
         ]
+    }
+    
+    func delete(_ update: Update, _ context: BotContext?) throws {
+        guard let chatID = update.message?.chat.id, let text = update.message?.text else {
+            return
+        }
+
+        guard let substring = text.split(separator: " ").last else {
+            return
+        }
+        
+        guard let id = Int(substring) else {
+            return
+        }
+        
+        env.container.withPooledConnection(to: .psql) { (connection) -> Future<Void> in
+            return Subscription
+                .query(on: connection)
+                .filter(\.id, .equal, id)
+                .delete()
+        }
+        .whenSuccess { (_) in
+            do {
+                _ = try self.send(chatID: chatID, text: "Подписка удалена")
+            } catch {
+                Log.error("Error send message \(error.localizedDescription)")
+            }
+        }
     }
 
     func subscribe(_ update: Update, _ context: BotContext?) throws {
@@ -46,8 +82,6 @@ class SubscribeController: ParentController, CommandsHandler {
             return
         }
 
-        _ = try? self.send(chatID: chatID, text: "subscribe begin")
-        
         env.container.withPooledConnection(to: .psql) { (connection) -> Future<Subscription> in
             let subscription = Subscription(chatID: chatID, query: text)
             return subscription.save(on: connection)
@@ -74,7 +108,7 @@ class SubscribeController: ParentController, CommandsHandler {
             return
         }
 
-        Log.info("Hours \(String(describing: scheduler.currentHours)) day \(String(describing: scheduler.currentDay))")
+        Log.info("Force hours \(String(describing: scheduler.currentHours)) day \(String(describing: scheduler.currentDay))")
         execute(chatID: chatID, time: nil, day: nil)
     }
 
@@ -117,6 +151,31 @@ class SubscribeController: ParentController, CommandsHandler {
         .whenSuccess { (response) in
             do {
                 _ = try self.send(chatID: chatID, text: response)
+            } catch {
+                Log.error("Error send message \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func allSubscriptions(_ update: Update, _ context: BotContext?) throws {
+        guard let chatID = update.message?.chat.id else {
+            return
+        }
+
+        env.container.withPooledConnection(to: .psql) { (connection) -> Future<[Subscription]> in
+            return Subscription
+                .query(on: connection)
+                .all()
+        }
+        .map({ (subscriptions) -> [String] in
+            subscriptions
+                .map { "\($0.id ?? -1) \($0.chatID) \($0.query)" }
+        })
+        .whenSuccess { (response) in
+            do {
+                for text in response {
+                    _ = try self.send(chatID: chatID, text: text)
+                }
             } catch {
                 Log.error("Error send message \(error.localizedDescription)")
             }
@@ -183,8 +242,6 @@ class SubscribeController: ParentController, CommandsHandler {
 
     private func execute(chatID: Int64?, time: Int?, day: SubscribeRequest.Days?) {
         env.container.withPooledConnection(to: .psql) { (connection) -> Future<[Subscription]> in
-            Log.info("Extract subscribes")
-
             var builder = Subscription.query(on: connection)
 
             if let chatID = chatID {
@@ -194,7 +251,6 @@ class SubscribeController: ParentController, CommandsHandler {
             return builder.all()
         }
         .map { (subscriptions) -> [SubscribeRequest] in
-            Log.info("Convert subscriptions to requests \(subscriptions.count)")
             return subscriptions
                 .compactMap { (subscription) -> SubscribeRequest? in
                     SubscribeRequest(chatID: subscription.chatID, query: subscription.query)
@@ -208,11 +264,12 @@ class SubscribeController: ParentController, CommandsHandler {
                 }
         }
         .map { (requests) -> [Update] in
-            Log.info("Convert to Update requests \(requests.count)")
-
             return requests.map { (request) -> Update in
                 let chat = Chat(id: request.chatID, type: .undefined)
                 let entity = MessageEntity(type: .botCommand, offset: 0, length: request.command.count + 1)
+                
+                Log.info("Configure Update \"\(request.command)\" text: \"\(request.query)\"")
+                
                 let message = Message(messageId: 0, date: 0, chat: chat, text: request.query, entities: [entity])
                 return Update(updateId: 0, message: message)
             }
