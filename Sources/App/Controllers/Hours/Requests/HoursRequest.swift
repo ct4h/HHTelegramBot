@@ -55,6 +55,7 @@ struct HoursRequest {
     let users: [String]
     let period: Period
     let daysOffset: TimeInterval
+    let additionalValues: [String]
 
     init?(from message: String?) {
         guard let message = message else {
@@ -68,7 +69,8 @@ struct HoursRequest {
         customValues = components[safe: "customValues"]?.params ?? []
         departments = components[safe: "departments"]?.params ?? []
         users = components[safe: "users"]?.params ?? []
-
+        additionalValues = components[safe: "additional"]?.params ?? []
+        
         if let period = Period.make(components: components[safe: "period"]?.params ?? []) {
             self.period = period
         } else {
@@ -79,6 +81,6 @@ struct HoursRequest {
             self.daysOffset = daysOffset
         } else {
             self.daysOffset = 0
-        }    
+        }  
     }
 }
