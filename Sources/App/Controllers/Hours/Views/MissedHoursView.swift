@@ -15,7 +15,7 @@ class MissedHoursView: HoursView {
         let overtimeHours: Float
         
         func notTracked(norma: Float) -> Float {
-            norma - (totalHours - overtimeHours)
+            return norma - (totalHours - overtimeHours)
         }
         
         func textInfo(norma: Float) -> String {
@@ -131,7 +131,7 @@ private extension ProjectResponse {
 
 private extension IssueResponse {
     var overtimes: Float {
-        timeEntries
+        return timeEntries
             .filter { $0.activity_id == 25 }
             .reduce(into: 0) { $0 = $0 + $1.hours }
     }
