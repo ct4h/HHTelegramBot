@@ -92,7 +92,7 @@ class HoursController: ParentController, CommandsHandler {
             var result: [HoursResponse] = []
 
             users.forEach { (user) in
-                let userInfo = HoursResponse.UserInformation(user: user.user, fields: user.fields)
+                let userInfo = HoursResponse.UserInformation(user: user.user, department: user.department, fields: user.fields)
 
                 if let time = times.first(where: { $0.userID == user.user.id }) {
                     result.append(HoursResponse(userInformation: userInfo, projects: time.projects))

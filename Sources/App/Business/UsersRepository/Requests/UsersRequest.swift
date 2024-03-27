@@ -4,5 +4,5 @@ import FluentSQL
 import MySQL
 
 protocol UsersRequest: CustomFieldsRequest {
-    func all(on connection: MySQLDatabase.Connection) -> Future<[(User, EmailAddress)]>
+    func all(on connection: MySQLDatabase.Connection) -> Future<[((User, EmailAddress), Department)]>
 }

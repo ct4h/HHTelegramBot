@@ -55,6 +55,12 @@ extension HoursRequest: TimeEntriesRequest {
                 builder = builder
                     .filter(\TimeEntries.spent_on, .greaterThanOrEqual, fromDate)
                     .filter(\TimeEntries.spent_on, .lessThanOrEqual, toDate)
+            case let .custom(from, to):
+                if let fromDate = DateFormatter.yyyyMMdd.date(from: from), let toDate = DateFormatter.yyyyMMdd.date(from: to) {
+                    builder = builder
+                        .filter(\TimeEntries.spent_on, .greaterThanOrEqual, fromDate)
+                        .filter(\TimeEntries.spent_on, .lessThanOrEqual, toDate)
+                }
             }
         }
 

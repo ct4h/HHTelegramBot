@@ -30,9 +30,10 @@ final class UsersRepository: ServiceType {
             var result: [UserResponse] = []
 
             users.forEach { (userData) in
-                let (user, emailAddress) = userData
+                let ((user, emailAddress), department) = userData
+                
                 if let userId = user.id, let fields = customFields[userId] {
-                    result.append(UserResponse(user: user, email: emailAddress.address, fields: fields))
+                    result.append(UserResponse(user: user, email: emailAddress.address, department: department, fields: fields))
                 }
             }
 

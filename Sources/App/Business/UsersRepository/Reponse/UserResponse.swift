@@ -10,5 +10,6 @@ import Foundation
 struct UserResponse {
     let user: User
     let email: String
+    let department: Department
     let fields: [CustomFieldsResponse]
 }
