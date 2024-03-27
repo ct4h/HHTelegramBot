@@ -69,7 +69,7 @@ class MissedHoursView: HoursView {
         
         let departments: [String] = Array(result.keys)
         
-        let resultText = departments
+        return departments
             .sorted(by: < )
             .compactMap { (department) -> String? in
                 guard let users = result[department] else {
@@ -88,18 +88,14 @@ class MissedHoursView: HoursView {
                 
                 switch request.period {
                 case .custom:
-                    return "\(department) \(totalMissed.hoursString):\n" + usersInfo
+                    return "*\(department) \(totalMissed.hoursString):*\n" + usersInfo
                 default:
-                    return "\(department):\n" + usersInfo
+                    return "*\(department):*\n" + usersInfo
                 }
             }
-            .joined(separator: "\n\n")
-        
-        if resultText.isEmpty {
-            return ["*Недотрек за \(reportDate)* Отсутствуют 🥳"]
-        } else {
-            return ["*Недотрек за \(reportDate)* 👀\n\n" + resultText]
-        }
+            .map { resultText in
+                return "*Недотрек за \(reportDate)* \(resultText)"
+            }
     }
     
     func periodDate(request: HoursRequest) -> String {
