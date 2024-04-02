@@ -3,6 +3,13 @@ import Telegrammer
 import Vapor
 import LoggerAPI
 
+// 0. Вывести сколько ядер у системы
+// 1. Добавить отладочную информацию, что иницирован запрос
+// 2. Dispatcher для обработки команд, чтобы команды по одной отрабатывали ??
+// 3. Конфигурация базы уменьшить кол-во максимальных соединений
+// 4. Переделать вызов команд на Future, чтобы они по очереди выполнялись
+// 5. Диспетчиеризация бота крутится на том же воркере что и база!
+
 final class RedmineBot: ServiceType {
 
     private let bot: Bot
@@ -38,6 +45,8 @@ final class RedmineBot: ServiceType {
         subscribeController.delegate = self
 
         try restart()
+        
+        try healthController.send(error: "Start bot core count \(System.coreCount) max connections \(DatabaseConnectionPoolConfig.default().maxConnections)")
     }
 
     func restart() throws {
@@ -84,6 +93,8 @@ extension RedmineBot: SubscribeControllerDelegate {
         
         Log.info("Bot handle count updates \(updates.count)")
 
+        // TODO: Очередь ???
+        
         for update in updates {
             hoursController.handlers.forEach { (handler) in
                 if handler.check(update: update) {
