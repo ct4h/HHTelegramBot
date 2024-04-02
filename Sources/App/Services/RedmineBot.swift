@@ -45,8 +45,8 @@ final class RedmineBot: ServiceType {
         subscribeController.delegate = self
 
         try restart()
-        
-        try healthController.send(error: "Start bot core count \(System.coreCount) max connections \(DatabaseConnectionPoolConfig.default().maxConnections)")
+//        
+//        try healthController.send(error: "Start bot core count \(System.coreCount) max connections \(DatabaseConnectionPoolConfig.default().maxConnections)")
     }
 
     func restart() throws {

@@ -11,6 +11,9 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     databases.add(database: postgresDB, as: .psql)
     databases.add(database: mysqlDB, as: .mysql)
     services.register(databases)
+    
+    let poolConfig = DatabaseConnectionPoolConfig(maxConnections: 1)
+    services.register(poolConfig)
 
     // Configure migrations
     var migrations = MigrationConfig()
