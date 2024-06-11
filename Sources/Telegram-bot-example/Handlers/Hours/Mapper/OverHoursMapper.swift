@@ -20,6 +20,8 @@ final class OverHoursMapper: HoursMapper {
         rows.forEach { user in
             var components: [String] = []
             
+            let overtime = user.total ?? 0 - hoursRangeLimit
+            
             if user.hours == 0 {
                 // Трек времени без овертаймов
                 components.append("🤖")
@@ -44,7 +46,8 @@ final class OverHoursMapper: HoursMapper {
                 .joined(separator: " ")
             
             components.append(userName)
-            components.append("\(user.hours.hoursString) / *\((user.total ?? 0).hoursString)*")
+            components.append("*\(overtime)*")
+            components.append("(\(user.hours.hoursString) / \((user.total ?? 0).hoursString))")
             
             let userString = components.joined(separator: " ")
             
