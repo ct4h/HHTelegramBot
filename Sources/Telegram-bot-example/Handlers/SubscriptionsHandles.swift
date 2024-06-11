@@ -9,6 +9,7 @@ import Foundation
 import Vapor
 import TelegramVaporBot
 import Fluent
+import Algorithms
 
 final class SubscriptionsHandles {
     static func addHandlers(app: Vapor.Application, connection: TGConnectionPrtcl) async {
@@ -113,14 +114,18 @@ final class SubscriptionsHandles {
                 return
             }
             
-            let text = try await Subscription
+            let subscriptions = try await Subscription
                 .query(on: app.db(.psql))
                 .sort(\.$id)
                 .all()
                 .map { "\($0.id ?? -1) \($0.chatID) \($0.query)" }
-                .joined(separator: "\n")
-            
-            try await bot.sendMessage(params: .init(chatId: .chat(message.chat.id), text: text))
+                .chunks(ofCount: 10)
+                
+            // TODO: Добавить обертку над foreach для try async
+            for chunck in subscriptions {
+                let text: String = chunck.joined(separator: "\n")
+                try await bot.sendMessage(params: .init(chatId: .chat(message.chat.id), text: text))
+            }
         })
     }
 }
