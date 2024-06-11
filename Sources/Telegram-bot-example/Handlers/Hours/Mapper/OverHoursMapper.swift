@@ -20,7 +20,7 @@ final class OverHoursMapper: HoursMapper {
         rows.forEach { user in
             var components: [String] = []
             
-            let overtime = user.total ?? 0 - hoursRangeLimit
+            let overtime = (user.total ?? 0) - hoursRangeLimit
             
             if user.hours == 0 {
                 // Трек времени без овертаймов
