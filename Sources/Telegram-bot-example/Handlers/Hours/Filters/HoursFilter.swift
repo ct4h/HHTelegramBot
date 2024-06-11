@@ -28,4 +28,14 @@ enum HoursFilter {
             return "\(from) - \(to)"
         }
     }
+    
+    var countDays: Int {
+        switch self {
+        case .day:
+            return 1
+        case let .range(from, to):
+            // TODO: Добавить вычисление рабочих дней внутри диапозона
+            return 5
+        }
+    }
 }

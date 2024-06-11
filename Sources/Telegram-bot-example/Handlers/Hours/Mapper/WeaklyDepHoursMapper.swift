@@ -9,10 +9,10 @@ import Foundation
 
 final class WeaklyDepHoursMapper: HoursMapper {
     func map(rows: [SQLUserRow], userFilter: UserFilter?, hoursFilter: HoursFilter) -> String {
-        let text = rows
+        var text = rows
             .map { user in
                 var components: [String] = [
-                    (user.hours / 5).hoursIcon
+                    (user.hours / Double(hoursFilter.countDays)).hoursIcon
                 ]
                 
                 if let nickname = user.telegram_account {
@@ -34,6 +34,10 @@ final class WeaklyDepHoursMapper: HoursMapper {
             }
             .joined(separator: "\n")
     
+        if text.isEmpty {
+            text = "Все затрекали 🥳"
+        }
+        
         let titleMessage = "*\(userFilter?.description ?? "") \(hoursFilter.description)*"
         
         return [titleMessage, text]

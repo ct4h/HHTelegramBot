@@ -18,7 +18,7 @@ final class NonWorkingHoursMapper: HoursMapper {
         rows.forEach { user in
             var components: [String] = []
             
-            if user.hours == 0, let nickname = user.telegram_account {
+            if let nickname = user.telegram_account {
                 if nickname.first == "@" {
                     components.append(nickname)
                 } else {

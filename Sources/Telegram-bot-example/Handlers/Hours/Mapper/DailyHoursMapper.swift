@@ -12,7 +12,7 @@ final class DailyHoursMapper: HoursMapper {
         let text = rows
             .map { user in
                 var components: [String] = [
-                    user.hours.hoursIcon
+                    (user.hours / Double(hoursFilter.countDays)).hoursIcon
                 ]
                 
                 if user.hours == 0, let nickname = user.telegram_account {

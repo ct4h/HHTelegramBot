@@ -34,7 +34,7 @@ LEFT JOIN (
     GROUP BY user_id
 ) as te ON us.id=te.user_id
 WHERE us.status=1 AND %@
-ORDER BY us.lastname
+ORDER BY us.id
 """
         
         let joins = userFilter.joins.joined(separator: " ")
