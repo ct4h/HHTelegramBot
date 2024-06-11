@@ -36,6 +36,9 @@ final class HoursHandlers {
         /// Команда формирует отчет по людем затрекавщих простой
         case nonWorkingHours
         
+        /// Команда формирует отчет по переработкам
+        case overHours
+        
         var sqlBuilder: HoursSQLBuilder {
             switch self {
             case .hours:
@@ -44,6 +47,8 @@ final class HoursHandlers {
                 return WeaklyHoursSQLBuilder()
             case .nonWorkingHours:
                 return NonWorkingHoursSQLBuilder()
+            case .overHours:
+                return OverHoursSQLBuilder()
             }
         }
                 
@@ -57,6 +62,8 @@ final class HoursHandlers {
                 return WeaklyDepHoursMapper()
             case .nonWorkingHours:
                 return NonWorkingHoursMapper()
+            case .overHours:
+                return OverHoursMapper()
             }
         }
     }
