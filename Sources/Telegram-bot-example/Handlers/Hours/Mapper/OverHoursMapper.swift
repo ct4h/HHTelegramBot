@@ -46,7 +46,7 @@ final class OverHoursMapper: HoursMapper {
                 .joined(separator: " ")
             
             components.append(userName)
-            components.append("*\(overtime)*")
+            components.append("*\(overtime.hoursString)*")
             components.append("(\(user.hours.hoursString) / \((user.total ?? 0).hoursString))")
             
             let userString = components.joined(separator: " ")
