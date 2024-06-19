@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", .upToNextMajor(from: "4.57.0")),
-        .package(url: "https://github.com/ct4h/telegram-vapor-bot", from: "1.0.0"),
+        .package(url: "https://github.com/ct4h/telegram-vapor-bot", from: "1.0.1"),
         .package(url: "https://github.com/vapor/fluent.git", from: "4.0.0"),
         .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.0.0"),
         .package(url: "https://github.com/ct4h/fluent-mysql-driver", from: "1.0.1"),

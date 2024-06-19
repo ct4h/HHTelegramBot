@@ -48,7 +48,13 @@ func configure(_ app: Application) async throws {
     
     let bot: TGBot = .init(app: app, botId: Environment.get("TELEGRAM_BOT_TOKEN")!)
     
-    await TGBOT.setConnection(try await TGLongPollingConnection(bot: bot))
+    let connection = try await TGLongPollingConnection(bot: bot) { error in
+        Task.detached {
+            await HealthHandlers.health(app: app, connection: TGBOT.connection, error: error)
+        }
+    }
+    
+    await TGBOT.setConnection(connection)
     
     await SubscriptionsHandles.addHandlers(app: app, connection: TGBOT.connection)
     await HoursHandlers.addHandlers(app: app, connection: TGBOT.connection)
