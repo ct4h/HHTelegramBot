@@ -8,7 +8,7 @@
 import Vapor
 import Queues
 import Fluent
-import TelegramVaporBot
+import SwiftTelegramSdk
 
 struct SubscriptionSheduler: AsyncScheduledJob {
     func run(context: QueueContext) async throws {

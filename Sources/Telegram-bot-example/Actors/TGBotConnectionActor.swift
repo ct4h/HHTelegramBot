@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import TelegramVaporBot
+import SwiftTelegramSdk
 
 actor TGBotConnection {
     private var _connection: TGConnectionPrtcl!

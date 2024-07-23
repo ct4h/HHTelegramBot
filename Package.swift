@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", .upToNextMajor(from: "4.57.0")),
-        .package(url: "https://github.com/ct4h/telegram-vapor-bot", from: "1.0.1"),
+        .package(url: "https://github.com/nerzh/swift-telegram-sdk", from: "3.4.2"),
         .package(url: "https://github.com/vapor/fluent.git", from: "4.0.0"),
         .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.0.0"),
         .package(url: "https://github.com/ct4h/fluent-mysql-driver", from: "1.0.1"),
@@ -20,7 +20,7 @@ let package = Package(
             name: "Telegram-bot-example",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
-                .product(name: "TelegramVaporBot", package: "telegram-vapor-bot"),
+                .product(name: "SwiftTelegramSdk", package: "swift-telegram-sdk"),
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
                 .product(name: "FluentMySQLDriver", package: "fluent-mysql-driver"),

@@ -7,7 +7,7 @@
 
 import Foundation
 import Vapor
-import TelegramVaporBot
+import SwiftTelegramSdk
 import Fluent
 import Algorithms
 
