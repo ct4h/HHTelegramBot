@@ -7,10 +7,12 @@
 
 import Foundation
 import Vapor
-import TelegramVaporBot
+import SwiftTelegramSdk
 import Fluent
 import FluentSQL
 import FluentMySQLDriver
+
+let serialQueue = DispatchQueue(label: "mysql.queue")
 
 final class HoursHandlers {
     private enum Command: String, CaseIterable {
@@ -68,9 +70,9 @@ final class HoursHandlers {
         }
     }
     
-    static func addHandlers(app: Vapor.Application, connection: TGConnectionPrtcl) async {
+    static func addHandlers(bot: TGBot) async {
         for command in Command.allCases {
-            await connection.dispatcher.add(TGCommandHandler(commands: ["/\(command.rawValue)"]) { update, bot in
+            await bot.dispatcher.add(TGCommandHandler(commands: ["/\(command.rawValue)"]) { update in
                 try await handler(app: app, update: update, bot: bot, sqlBuilder: command.sqlBuilder, mapper: command.mapper)
             })
         }
@@ -95,12 +97,12 @@ final class HoursHandlers {
         guard
             let hoursFilter = request.hoursFiler,
             let sql = app.db(.mysql) as? SQLDatabase,
-            let sqlRequst = sqlBuilder.sqlRequest(userFilter: userFilter, hoursFilter: hoursFilter)
+            let sqlRequest = sqlBuilder.sqlRequest(userFilter: userFilter, hoursFilter: hoursFilter)
         else {
             return
         }
         
-        let rows = try await sql.raw(sqlRequst)
+        let rows = try await sql.raw(sqlRequest)
             .all(decoding: SQLUserRow.self)
         
         let text = mapper.map(rows: rows, userFilter: userFilter, hoursFilter: hoursFilter)

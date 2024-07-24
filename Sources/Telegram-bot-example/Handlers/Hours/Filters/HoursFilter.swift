@@ -33,7 +33,7 @@ enum HoursFilter {
         switch self {
         case .day:
             return 1
-        case let .range(from, to):
+        case .range(_, _):
             // TODO: Добавить вычисление рабочих дней внутри диапозона
             return 5
         }

@@ -7,7 +7,7 @@
 
 import Foundation
 import Vapor
-import TelegramVaporBot
+import SwiftTelegramSdk
 import Fluent
 import FluentPostgresDriver
 import FluentMySQLDriver
@@ -39,31 +39,33 @@ func configure(_ app: Application) async throws {
             username: Environment.get("MySQL_DB_USER") ?? "",
             password: Environment.get("MySQL_DB_PASSWORD") ?? "",
             database: Environment.get("MySQL_DB_DATABASE"),
-            tlsConfiguration: tls
+            tlsConfiguration: tls,
+            connectionPoolTimeout: .seconds(100)
         ),
         as: .mysql
     )
     
-    TGBot.log.logLevel = app.logger.logLevel
+    let bot: TGBot = try await .init(
+        connectionType: .longpolling(
+            limit: nil,
+            timeout: nil,
+            allowedUpdates: nil),
+        dispatcher: TGBotDispatcher(log: app.logger),
+        tgClient: TGApiClient(client: app.client),
+        botId: Environment.get("TELEGRAM_BOT_TOKEN")!,
+        log: app.logger
+    )
     
-    let bot: TGBot = .init(app: app, botId: Environment.get("TELEGRAM_BOT_TOKEN")!)
+    await botActor.setBot(bot)
     
-    let connection = try await TGLongPollingConnection(bot: bot) { error in
-        Task.detached {
-            await HealthHandlers.health(app: app, connection: TGBOT.connection, error: error)
-        }
-    }
+    await SubscriptionsHandles.addHandlers(bot: bot)
+    await HoursHandlers.addHandlers(bot: bot)
     
-    await TGBOT.setConnection(connection)
-    
-    await SubscriptionsHandles.addHandlers(app: app, connection: TGBOT.connection)
-    await HoursHandlers.addHandlers(app: app, connection: TGBOT.connection)
+    try await botActor.bot.start()
     
     app.queues.schedule(SubscriptionSheduler())
         .hourly()
         .at(0)
 
-    try await TGBOT.connection.start()
-    
     try app.queues.startScheduledJobs()
 }

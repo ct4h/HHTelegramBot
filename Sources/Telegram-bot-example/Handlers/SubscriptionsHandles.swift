@@ -7,34 +7,43 @@
 
 import Foundation
 import Vapor
-import TelegramVaporBot
+import SwiftTelegramSdk
 import Fluent
 import Algorithms
 
 final class SubscriptionsHandles {
-    static func addHandlers(app: Vapor.Application, connection: TGConnectionPrtcl) async {
-        await subscribe(app: app, connection: connection)
-        await deleteChatSubscriptions(app: app, connection: connection)
-        await deleteSubscription(app: app, connection: connection)
-        await force(app: app, connection: connection)
-        await chatSubscriptions(app: app, connection: connection)
-        await allSubscriptions(app: app, connection: connection)
+    static func addHandlers(bot: TGBot) async {
+        await subscribe(bot: bot)
+        await deleteChatSubscriptions(bot: bot)
+        await deleteSubscription(bot: bot)
+        await force(bot: bot)
+        await chatSubscriptions(bot: bot)
+        await allSubscriptions(bot: bot)
     }
     
-    private static func subscribe(app: Vapor.Application, connection: TGConnectionPrtcl) async {
-        await connection.dispatcher.add(TGCommandHandler(commands: ["/subscribe"]) { update, bot in
+    private static func subscribe(bot: TGBot) async {
+        await bot.dispatcher.add(TGCommandHandler(commands: ["/subscribe"]) { update in
             guard let message = update.message, let query = message.text else {
                 return
             }
             
+            let count = try await Subscription.query(on: app.db(.psql))
+                .filter(\.$chatID == message.chat.id)
+                .filter(\.$query == query)
+                .count()
+            
+            guard count == 0 else {
+                return
+            }
+                        
             let subscription = Subscription(chatID: message.chat.id, query: query)
             try await subscription.create(on: app.db(.psql))
             try await bot.sendMessage(params: .init(chatId: .chat(message.chat.id), text: "Команда успешно сохранена"))
         })
     }
     
-    private static func deleteChatSubscriptions(app: Vapor.Application, connection: TGConnectionPrtcl) async {
-        await connection.dispatcher.add(TGCommandHandler(commands: ["/deleteChatSubscriptions"]) { update, bot in
+    private static func deleteChatSubscriptions(bot: TGBot) async {
+        await bot.dispatcher.add(TGCommandHandler(commands: ["/deleteChatSubscriptions"]) { update in
             guard let message = update.message else {
                 return
             }
@@ -47,9 +56,9 @@ final class SubscriptionsHandles {
         })
     }
     
-    private static func deleteSubscription(app: Vapor.Application, connection: TGConnectionPrtcl) async {
-        await connection.dispatcher.add(TGCommandHandler(commands: ["/deleteSubscription"]) { update, bot in
-            guard 
+    private static func deleteSubscription(bot: TGBot) async {
+        await bot.dispatcher.add(TGCommandHandler(commands: ["/deleteSubscription"]) { update in
+            guard
                 let message = update.message,
                 let text = message.text,
                 let substring = text.split(separator: " ").last,
@@ -66,8 +75,8 @@ final class SubscriptionsHandles {
         })
     }
     
-    private static func force(app: Vapor.Application, connection: TGConnectionPrtcl) async {
-        await connection.dispatcher.add(TGCommandHandler(commands: ["/force"]) { update, bot in
+    private static func force(bot: TGBot) async {
+        await bot.dispatcher.add(TGCommandHandler(commands: ["/force"]) { update in
             guard let message = update.message else {
                 return
             }
@@ -87,12 +96,12 @@ final class SubscriptionsHandles {
                     return TGUpdate(updateId: 0, message: message)
                 }
             
-            try await TGBOT.connection.dispatcher.process(updates)
+            bot.dispatcher.process(updates)
         })
     }
     
-    private static func chatSubscriptions(app: Vapor.Application, connection: TGConnectionPrtcl) async {
-        await connection.dispatcher.add(TGCommandHandler(commands: ["/chatSubscriptions"]) { update, bot in
+    private static func chatSubscriptions(bot: TGBot) async {
+        await bot.dispatcher.add(TGCommandHandler(commands: ["/chatSubscriptions"]) { update in
             guard let message = update.message else {
                 return
             }
@@ -108,8 +117,8 @@ final class SubscriptionsHandles {
         })
     }
     
-    private static func allSubscriptions(app: Vapor.Application, connection: TGConnectionPrtcl) async {
-        await connection.dispatcher.add(TGCommandHandler(commands: ["/allSubscriptions"]) { update, bot in
+    private static func allSubscriptions(bot: TGBot) async {
+        await bot.dispatcher.add(TGCommandHandler(commands: ["/allSubscriptions"]) { update in
             guard let message = update.message else {
                 return
             }
