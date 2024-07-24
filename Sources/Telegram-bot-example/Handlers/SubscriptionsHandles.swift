@@ -27,6 +27,15 @@ final class SubscriptionsHandles {
                 return
             }
             
+            let count = try await Subscription.query(on: app.db(.psql))
+                .filter(\.$chatID == message.chat.id)
+                .filter(\.$query == query)
+                .count()
+            
+            guard count == 0 else {
+                return
+            }
+                        
             let subscription = Subscription(chatID: message.chat.id, query: query)
             try await subscription.create(on: app.db(.psql))
             try await bot.sendMessage(params: .init(chatId: .chat(message.chat.id), text: "Команда успешно сохранена"))
