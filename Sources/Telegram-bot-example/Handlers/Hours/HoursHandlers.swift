@@ -12,6 +12,8 @@ import Fluent
 import FluentSQL
 import FluentMySQLDriver
 
+let serialQueue = DispatchQueue(label: "mysql.queue")
+
 final class HoursHandlers {
     private enum Command: String, CaseIterable {
         /// Команда выводит сумму затреканных часов за период по людям
@@ -95,12 +97,12 @@ final class HoursHandlers {
         guard
             let hoursFilter = request.hoursFiler,
             let sql = app.db(.mysql) as? SQLDatabase,
-            let sqlRequst = sqlBuilder.sqlRequest(userFilter: userFilter, hoursFilter: hoursFilter)
+            let sqlRequest = sqlBuilder.sqlRequest(userFilter: userFilter, hoursFilter: hoursFilter)
         else {
             return
         }
         
-        let rows = try await sql.raw(sqlRequst)
+        let rows = try await sql.raw(sqlRequest)
             .all(decoding: SQLUserRow.self)
         
         let text = mapper.map(rows: rows, userFilter: userFilter, hoursFilter: hoursFilter)

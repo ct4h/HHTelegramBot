@@ -40,7 +40,6 @@ struct SubscribeRequest {
         }
         
         if let scheduleDays = components[safe: "scheduleDays"] {
-            let params = scheduleDays.params
             days = scheduleDays.params.compactMap { Days(rawValue: $0) }
             components.removeAll(where: { $0 == scheduleDays })
         } else {

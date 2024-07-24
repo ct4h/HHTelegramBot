@@ -39,7 +39,8 @@ func configure(_ app: Application) async throws {
             username: Environment.get("MySQL_DB_USER") ?? "",
             password: Environment.get("MySQL_DB_PASSWORD") ?? "",
             database: Environment.get("MySQL_DB_DATABASE"),
-            tlsConfiguration: tls
+            tlsConfiguration: tls,
+            connectionPoolTimeout: .seconds(100)
         ),
         as: .mysql
     )
@@ -49,9 +50,8 @@ func configure(_ app: Application) async throws {
             limit: nil,
             timeout: nil,
             allowedUpdates: nil),
-        dispatcher: nil,
-        tgClient: VaporTGClient(client: app.client),
-        tgURI: TGBot.standardTGURL,
+        dispatcher: TGBotDispatcher(log: app.logger),
+        tgClient: TGApiClient(client: app.client),
         botId: Environment.get("TELEGRAM_BOT_TOKEN")!,
         log: app.logger
     )

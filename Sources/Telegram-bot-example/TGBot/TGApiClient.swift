@@ -16,7 +16,7 @@ enum TGHTTPMediaType: String, Equatable {
 
 private struct TGEmptyParams: Encodable {}
 
-final class VaporTGClient: TGClientPrtcl {
+final class TGApiClient: TGClientPrtcl {
     
     typealias HTTPMediaType = SwiftTelegramSdk.HTTPMediaType
     var log: Logging.Logger = .init(label: "VaporTGClient")
