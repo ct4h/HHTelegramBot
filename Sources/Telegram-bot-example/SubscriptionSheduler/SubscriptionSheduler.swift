@@ -60,6 +60,6 @@ struct SubscriptionSheduler: AsyncScheduledJob {
                 return TGUpdate(updateId: 0, message: message)
             }
             
-        try await TGBOT.connection.dispatcher.process(updates)
+        await botActor.bot.dispatcher.process(updates)
     }
 }

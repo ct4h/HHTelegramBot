@@ -44,26 +44,28 @@ func configure(_ app: Application) async throws {
         as: .mysql
     )
     
-    TGBot.log.logLevel = app.logger.logLevel
+    let bot: TGBot = try await .init(
+        connectionType: .longpolling(
+            limit: nil,
+            timeout: nil,
+            allowedUpdates: nil),
+        dispatcher: nil,
+        tgClient: VaporTGClient(client: app.client),
+        tgURI: TGBot.standardTGURL,
+        botId: Environment.get("TELEGRAM_BOT_TOKEN")!,
+        log: app.logger
+    )
     
-    let bot: TGBot = .init(app: app, botId: Environment.get("TELEGRAM_BOT_TOKEN")!)
+    await botActor.setBot(bot)
     
-    let connection = try await TGLongPollingConnection(bot: bot) { error in
-        Task.detached {
-            await HealthHandlers.health(app: app, connection: TGBOT.connection, error: error)
-        }
-    }
+    await SubscriptionsHandles.addHandlers(bot: bot)
+    await HoursHandlers.addHandlers(bot: bot)
     
-    await TGBOT.setConnection(connection)
-    
-    await SubscriptionsHandles.addHandlers(app: app, connection: TGBOT.connection)
-    await HoursHandlers.addHandlers(app: app, connection: TGBOT.connection)
+    try await botActor.bot.start()
     
     app.queues.schedule(SubscriptionSheduler())
         .hourly()
         .at(0)
 
-    try await TGBOT.connection.start()
-    
     try app.queues.startScheduledJobs()
 }

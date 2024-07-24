@@ -68,9 +68,9 @@ final class HoursHandlers {
         }
     }
     
-    static func addHandlers(app: Vapor.Application, connection: TGConnectionPrtcl) async {
+    static func addHandlers(bot: TGBot) async {
         for command in Command.allCases {
-            await connection.dispatcher.add(TGCommandHandler(commands: ["/\(command.rawValue)"]) { update, bot in
+            await bot.dispatcher.add(TGCommandHandler(commands: ["/\(command.rawValue)"]) { update in
                 try await handler(app: app, update: update, bot: bot, sqlBuilder: command.sqlBuilder, mapper: command.mapper)
             })
         }
